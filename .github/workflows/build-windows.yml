@@ -56,15 +56,13 @@ jobs:
             ${{ runner.os }}-deps-
 
       - name: Configure CMake
-        shell: pwsh
         run: |
-          $env:PATH = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin;$env:PATH"
-          cmake -B build_x64 -S . -G "Visual Studio 17 2022" -A x64 `
-            -DCMAKE_SYSTEM_VERSION=10.0.22621.0 `
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo `
-            -DOBS_VERSION_OVERRIDE=32.1.0 `
-            -DVIRTUALCAM_GUID=76692E1E-F28F-4DD6-9024-C3A999D30EFB `
-            -DENABLE_BROWSER=OFF `
+          cmake -B build_x64 -S . -G "Visual Studio 17 2022" -A x64 ^
+            -DCMAKE_SYSTEM_VERSION=10.0.22621.0 ^
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo ^
+            -DOBS_VERSION_OVERRIDE=32.1.0 ^
+            -DVIRTUALCAM_GUID=76692E1E-F28F-4DD6-9024-C3A999D30EFB ^
+            -DENABLE_BROWSER=OFF ^
             -DENABLE_VLC=OFF
 
       - name: Build OBS Studio
