@@ -1,0 +1,97 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Build Windows x64
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup vcpkg cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ github.workspace }}/vcpkg_installed
+            ${{ github.workspace }}/build_x64/vcpkg
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/vcpkg.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
+
+      - name: Setup ccache cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ${{ runner.os }}-ccache-x64-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-x64-
+
+      - name: Setup Qt cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/build_x64/Qt
+          key: ${{ runner.os }}-qt-${{ hashFiles('cmake/Modules/FindQt6.cmake') }}
+          restore-keys: |
+            ${{ runner.os }}-qt-
+
+      - name: Setup deps cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/build_x64/obs-deps
+          key: ${{ runner.os }}-deps-${{ hashFiles('CI/cmake/x64-windows.json') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-
+
+      - name: Configure CMake
+        run: |
+          cmake -B build_x64 -S . -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_SYSTEM_VERSION=10.0.22621.0 `
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo `
+            -DVIRTUALCAM_GUID=76692E1E-F28F-4DD6-9024-C3A999D30EFB `
+            -DENABLE_BROWSER=OFF `
+            -DENABLE_VLC=OFF
+
+      - name: Build OBS Studio
+        run: cmake --build build_x64 --config RelWithDebInfo --parallel
+
+      - name: Create Release Package
+        shell: pwsh
+        run: |
+          $version = git describe --tags --abbrev=0 2>$null;if (!$version) { $version = "30.0.0" }
+          $dateTime = Get-Date -Format "yyyyMMdd-HHmm"
+          $outputName = "obs-studio-windows-x64-$dateTime"
+
+          New-Item -ItemType Directory -Force -Path package
+
+          # Copy OBS executable and dependencies
+          Copy-Item -Path "build_x64/rundir/RelWithDebInfo/*" -Destination "package/" -Recurse -Force
+
+          # Create zip
+          Compress-Archive -Path "package/*" -DestinationPath "$outputName.zip"
+
+      - name: Upload Windows Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: obs-studio-windows-x64-${{ github.run_number }}
+          path: obs-studio-windows-x64-*.zip
+          retention-days: 30
+
+      - name: Upload Virtual Camera Module
+        uses: actions/upload-artifact@v4
+        with:
+          name: obs-virtualcam-module
+          path: |
+            build_x64/rundir/RelWithDebInfo/obs-plugins/64bit/obs-virtualcam-module.dll
+            build_x64/obs-virtualcam*.bat
+          retention-days: 30
