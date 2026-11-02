@@ -1,95 +1,86 @@
 name: Build Windows
+run-name: Build Windows 🪟 ${{ github.ref_name }}
 
 on:
   push:
-    branches: [master]
+    paths-ignore:
+      - '**.md'
+    branches:
+      - master
+    tags:
+      - '*'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+    branches:
+      - master
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.head_ref || github.ref }}'
+  cancel-in-progress: true
+
 jobs:
-  build-windows:
-    name: Build Windows x64
-    runs-on: windows-2022
+  windows-build:
+    name: Windows Build 🪟 (${{ matrix.architecture }})
+    runs-on: windows-2025-vs2026
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [x64]
+    defaults:
+      run:
+        shell: pwsh
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
           fetch-depth: 0
-          fetch-tags: true
 
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
-
-      - name: Setup vcpkg cache
-        uses: actions/cache@v4
+      - name: Build OBS Studio 🧱
+        uses: ./.github/actions/build-obs
         with:
-          path: |
-            ${{ github.workspace }}/vcpkg_installed
-            ${{ github.workspace }}/build_x64/vcpkg
-          key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/vcpkg.json') }}
-          restore-keys: |
-            ${{ runner.os }}-vcpkg-
+          target: ${{ matrix.architecture }}
+          config: ${{ startsWith(github.ref, 'refs/tags/') && 'Release' || 'RelWithDebInfo' }}
 
-      - name: Setup ccache cache
-        uses: actions/cache@v4
+      - name: Package OBS Studio 📀
+        uses: ./.github/actions/package-obs
         with:
-          path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-x64-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-x64-
+          target: ${{ matrix.architecture }}
+          config: ${{ startsWith(github.ref, 'refs/tags/') && 'Release' || 'RelWithDebInfo' }}
+          package: true
 
-      - name: Setup Qt cache
-        uses: actions/cache@v4
+      - name: Upload Build Artifacts 📡
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          path: ${{ github.workspace }}/build_x64/Qt
-          key: ${{ runner.os }}-qt-${{ hashFiles('cmake/Modules/FindQt6.cmake') }}
-          restore-keys: |
-            ${{ runner.os }}-qt-
+          name: obs-studio-windows-${{ matrix.architecture }}-${{ github.sha }}
+          path: ${{ github.workspace }}/build_${{ matrix.architecture }}/obs-studio-*-windows-${{ matrix.architecture }}.zip
 
-      - name: Setup deps cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/build_x64/obs-deps
-          key: ${{ runner.os }}-deps-${{ hashFiles('CI/cmake/x64-windows.json') }}
-          restore-keys: |
-            ${{ runner.os }}-deps-
-
-      - name: Configure CMake
+      - name: Create GitHub Release 🛫
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          cmake --list-preset=windows-x64
-          cmake --preset windows-x64 -DVIRTUALCAM_GUID=76692E1E-F28F-4DD6-9024-C3A999D30EFB
+          # Create GitHub Release (tag builds only)
+          $ErrorActionPreference = 'Stop'
+          $tag = '${{ github.ref_name }}'
 
-      - name: Build OBS Studio
-        run: cmake --build build_x64 --config RelWithDebInfo --parallel
+          $files = Get-ChildItem -Path "build_${{ matrix.architecture }}" -Filter "obs-studio-*-windows-${{ matrix.architecture }}.zip" -File
+          if ( $files.Count -eq 0 ) {
+            throw "No package zip found for release upload."
+          }
 
-      - name: Create Release Package
-        shell: pwsh
-        run: |
-          $version = git describe --tags --abbrev=0 2>$null;if (!$version) { $version = "30.0.0" }
-          $dateTime = Get-Date -Format "yyyyMMdd-HHmm"
-          $outputName = "obs-studio-windows-x64-$dateTime"
-
-          New-Item -ItemType Directory -Force -Path package
-
-          # Copy OBS executable and dependencies
-          Copy-Item -Path "build_x64/rundir/RelWithDebInfo/*" -Destination "package/" -Recurse -Force
-
-          # Create zip
-          Compress-Archive -Path "package/*" -DestinationPath "$outputName.zip"
-
-      - name: Upload Windows Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: obs-studio-windows-x64-${{ github.run_number }}
-          path: obs-studio-windows-x64-*.zip
-          retention-days: 30
-
-      - name: Upload Virtual Camera Module
-        uses: actions/upload-artifact@v4
-        with:
-          name: obs-virtualcam-module
-          path: |
-            build_x64/rundir/RelWithDebInfo/obs-plugins/64bit/obs-virtualcam-module.dll
-            build_x64/obs-virtualcam*.bat
-          retention-days: 30
+          gh release view $tag --repo ${Env:GITHUB_REPOSITORY} *> $null
+          if ( $LASTEXITCODE -ne 0 ) {
+            gh release create $tag `
+              --repo ${Env:GITHUB_REPOSITORY} `
+              --title "OBS Studio ${tag}" `
+              --notes "OBS Studio **${tag}** — fork with the Virtual Camera registered as **Logitech HD Pro Webcam C920** (GUID 76692E1E-F28F-4DD6-9024-C3A999D30EFB). Based on upstream obsproject/obs-studio. Windows x64 portable build — unzip and run, then use Start Virtual Camera." `
+              ${files.FullName}
+          } else {
+            gh release upload $tag --repo ${Env:GITHUB_REPOSITORY} --clobber ${files.FullName}
+          }
