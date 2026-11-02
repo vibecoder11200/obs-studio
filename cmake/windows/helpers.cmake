@@ -193,15 +193,23 @@ function(_target_install_obs target)
       set(suffix dll)
     endif()
 
+    # Cross-architecture copies normally follow the '<target>32' convention;
+    # a target may override with the OBS_X86_OUTPUT_NAME property when its
+    # per-architecture output name does not match that convention.
+    get_target_property(_TIO_X86_OUTPUT_NAME ${target} OBS_X86_OUTPUT_NAME)
+    if(NOT _TIO_X86_OUTPUT_NAME)
+      set(_TIO_X86_OUTPUT_NAME "${target}32")
+    endif()
+
     cmake_path(RELATIVE_PATH CMAKE_CURRENT_SOURCE_DIR BASE_DIRECTORY "${OBS_SOURCE_DIR}" OUTPUT_VARIABLE project_path)
 
     set(32bit_project_path "${OBS_SOURCE_DIR}/build_x86/${project_path}")
-    set(target_file "${32bit_project_path}/$<CONFIG>/${target}32.${suffix}")
-    set(target_pdb_file "${32bit_project_path}/$<CONFIG>/${target}32.pdb")
+    set(target_file "${32bit_project_path}/$<CONFIG>/${_TIO_X86_OUTPUT_NAME}.${suffix}")
+    set(target_pdb_file "${32bit_project_path}/$<CONFIG>/${_TIO_X86_OUTPUT_NAME}.pdb")
     set(comment "Copy ${target} (x86) to destination")
 
     install(
-      FILES "${32bit_project_path}/$<CONFIG>/${target}32.${suffix}"
+      FILES "${32bit_project_path}/$<CONFIG>/${_TIO_X86_OUTPUT_NAME}.${suffix}"
       DESTINATION "${_TIO_DESTINATION}"
       COMPONENT Runtime
       OPTIONAL
@@ -214,15 +222,21 @@ function(_target_install_obs target)
       set(suffix dll)
     endif()
 
+    # See the OBS_X86_OUTPUT_NAME note above.
+    get_target_property(_TIO_X64_OUTPUT_NAME ${target} OBS_X64_OUTPUT_NAME)
+    if(NOT _TIO_X64_OUTPUT_NAME)
+      set(_TIO_X64_OUTPUT_NAME "${target}64")
+    endif()
+
     cmake_path(RELATIVE_PATH CMAKE_CURRENT_SOURCE_DIR BASE_DIRECTORY "${OBS_SOURCE_DIR}" OUTPUT_VARIABLE project_path)
 
     set(64bit_project_path "${OBS_SOURCE_DIR}/build_x64/${project_path}")
-    set(target_file "${64bit_project_path}/$<CONFIG>/${target}64.${suffix}")
-    set(target_pdb_file "${64bit_project_path}/$<CONFIG>/${target}64.pdb")
+    set(target_file "${64bit_project_path}/$<CONFIG>/${_TIO_X64_OUTPUT_NAME}.${suffix}")
+    set(target_pdb_file "${64bit_project_path}/$<CONFIG>/${_TIO_X64_OUTPUT_NAME}.pdb")
     set(comment "Copy ${target} (x64) to destination")
 
     install(
-      FILES "${64bit_project_path}/$<CONFIG>/${target}64.${suffix}"
+      FILES "${64bit_project_path}/$<CONFIG>/${_TIO_X64_OUTPUT_NAME}.${suffix}"
       DESTINATION "${_TIO_DESTINATION}"
       COMPONENT Runtime
       OPTIONAL

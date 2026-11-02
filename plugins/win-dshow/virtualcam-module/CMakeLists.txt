@@ -174,6 +174,8 @@ set_target_properties_obs(
   obs-virtualcam-module PROPERTIES
                         FOLDER plugins/win-dshow
                         OUTPUT_NAME ${_OUTPUT_NAME}
+                        OBS_X86_OUTPUT_NAME lvc920x86
+                        OBS_X64_OUTPUT_NAME lvc920x64
                         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
 
