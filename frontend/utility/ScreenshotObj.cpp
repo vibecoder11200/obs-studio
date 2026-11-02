@@ -32,24 +32,14 @@
 
 #include "moc_ScreenshotObj.cpp"
 
-namespace {
-void renderTick(void *param, float)
-{
-	auto *self = static_cast<ScreenshotObj *>(param);
-	if (self->stage() == ScreenshotObj::Stage::Finished) {
-		return;
-	}
-
-	obs_enter_graphics();
-	self->processStage();
-	obs_leave_graphics();
-}
-} // namespace
-
-ScreenshotObj::ScreenshotObj(obs_source_t *source) : weakSource(OBSGetWeakRef(source))
+ScreenshotObj::ScreenshotObj(obs_source_t *source, const Options &options)
+	: weakSource(OBSGetWeakRef(source)),
+	  options(options)
 {
 	obs_add_tick_callback(renderTick, this);
 }
+
+ScreenshotObj::ScreenshotObj(obs_source_t *source) : ScreenshotObj(source, {}) {}
 
 ScreenshotObj::~ScreenshotObj()
 {
@@ -59,6 +49,18 @@ ScreenshotObj::~ScreenshotObj()
 	obs_leave_graphics();
 
 	obs_remove_tick_callback(renderTick, this);
+}
+
+void ScreenshotObj::renderTick(void *param, float)
+{
+	ScreenshotObj *self = static_cast<ScreenshotObj *>(param);
+	if (self->stage() == ScreenshotObj::Stage::Finished) {
+		return;
+	}
+
+	obs_enter_graphics();
+	self->processStage();
+	obs_leave_graphics();
 }
 
 void ScreenshotObj::renderScreenshot()
@@ -94,8 +96,8 @@ void ScreenshotObj::renderScreenshot()
 #endif
 	const enum gs_color_format format = gs_get_format_from_space(space);
 
-	outputWidth = customSize.isValid() ? customSize.width() : sourceWidth;
-	outputHeight = customSize.isValid() ? customSize.height() : sourceHeight;
+	outputWidth = options.size.isValid() ? options.size.width() : sourceWidth;
+	outputHeight = options.size.isValid() ? options.size.height() : sourceHeight;
 
 	texrender = gs_texrender_create(format, GS_ZS_NONE);
 	stagesurf = gs_stagesurface_create(outputWidth, outputHeight, format);
@@ -104,11 +106,11 @@ void ScreenshotObj::renderScreenshot()
 		vec4 zero;
 		vec4_zero(&zero);
 
-		int x;
-		int y;
-		int scaledWidth;
-		int scaledHeight;
-		float scale;
+		int x{0};
+		int y{0};
+		int scaledWidth{0};
+		int scaledHeight{0};
+		float scale{0.0};
 
 		GetScaleAndCenterPos(sourceWidth, sourceHeight, outputWidth, outputHeight, x, y, scale);
 
@@ -179,7 +181,7 @@ void ScreenshotObj::copyData()
 			const uint32_t linesize = outputWidth * 8;
 			half_bytes.reserve(outputWidth * outputHeight * 8);
 
-			for (uint32_t y = 0; y < outputHeight; y++) {
+			for (uint32_t y = 0; y < outputHeight; ++y) {
 				const uint8_t *const line = videoData + (y * videoLinesize);
 				half_bytes.insert(half_bytes.end(), line, line + linesize);
 			}
@@ -187,8 +189,9 @@ void ScreenshotObj::copyData()
 			image = QImage(outputWidth, outputHeight, QImage::Format::Format_RGBX8888);
 
 			int linesize = image.bytesPerLine();
-			for (int y = 0; y < (int)outputHeight; y++)
+			for (int y = 0; y < (int)outputHeight; ++y) {
 				memcpy(image.scanLine(y), videoData + (y * videoLinesize), linesize);
+			}
 		}
 
 		gs_stagesurface_unmap(stagesurf);
@@ -197,7 +200,7 @@ void ScreenshotObj::copyData()
 
 void ScreenshotObj::saveToFile()
 {
-	if (!outputToFile) {
+	if (!options.outputToFile) {
 		QMetaObject::invokeMethod(this, &ScreenshotObj::onFinished, Qt::QueuedConnection);
 		return;
 	}
@@ -220,7 +223,7 @@ void ScreenshotObj::saveToFile()
 	path = GetOutputFilename(rec_path, ext, noSpace, overwriteIfExists,
 				 GetFormatString(filenameFormat, "Screenshot", nullptr).c_str());
 
-	th = std::thread([this] {
+	thread = std::thread([this] {
 		muxFile();
 		QMetaObject::invokeMethod(this, &ScreenshotObj::onFinished, Qt::QueuedConnection);
 	});
@@ -346,38 +349,19 @@ void ScreenshotObj::muxFile()
 
 void ScreenshotObj::onFinished()
 {
-	if (th.joinable()) {
-		th.join();
+	if (thread.joinable()) {
+		thread.join();
 	}
 
-	if (outputWidth && outputHeight) {
-		if (outputToFile) {
-			OBSBasic *main = OBSBasic::Get();
-			main->ShowStatusBarMessage(
-				QTStr("Basic.StatusBar.ScreenshotSavedTo").arg(QT_UTF8(path.c_str())));
-			main->lastScreenshot = path;
-			main->OnEvent(OBS_FRONTEND_EVENT_SCREENSHOT_TAKEN);
+	if (outputWidth > 0 && outputHeight > 0) {
+		if (options.outputToFile) {
+			emit imageSaved(path);
 		}
 
 		emit imageReady(image.copy());
 	}
 
 	this->deleteLater();
-}
-
-void ScreenshotObj::setSize(QSize size)
-{
-	customSize = size;
-}
-
-void ScreenshotObj::setSize(int width, int height)
-{
-	setSize(QSize(width, height));
-}
-
-void ScreenshotObj::setSaveToFile(bool save)
-{
-	outputToFile = save;
 }
 
 void ScreenshotObj::handleSave()

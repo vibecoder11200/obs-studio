@@ -17,8 +17,9 @@
 
 #pragma once
 
-#include <utility/OBSTheme.hpp>
 #include <utility/NativeEventFilter.hpp>
+#include <utility/OBSTheme.hpp>
+#include <utility/ThumbnailManager.hpp>
 #include <widgets/OBSMainWindow.hpp>
 
 #include <obs-frontend-api.h>
@@ -28,10 +29,12 @@
 
 #include <QAbstractNativeEventFilter>
 #include <QApplication>
+#include <QHash>
 #include <QPalette>
 #include <QPointer>
 #include <QUuid>
 
+#include <array>
 #include <deque>
 #include <functional>
 #include <string>
@@ -89,6 +92,8 @@ private:
 
 	std::deque<obs_frontend_translate_ui_cb> translatorHooks;
 
+	ThumbnailManager *thumbnailManager = nullptr;
+
 	std::unique_ptr<OBS::PluginManager> pluginManager_;
 
 	bool UpdatePre22MultiviewLayout(const char *layout);
@@ -119,16 +124,19 @@ private:
 	bool notify(QObject *receiver, QEvent *e) override;
 
 #ifndef _WIN32
-	static int sigintFd[2];
-	QSocketNotifier *snInt = nullptr;
+	static std::array<int, 2> sigIntFileDescriptor;
+	static std::array<int, 2> sigTermFileDescriptor;
+	static std::array<int, 2> sigAbrtFileDescriptor;
+	static std::array<int, 2> sigQuitFileDescriptor;
 
-	static int sigtermFd[2];
-	QSocketNotifier *snTerm = nullptr;
+	QPointer<QSocketNotifier> sigIntNotifier{};
+	QPointer<QSocketNotifier> sigTermNotifier{};
+	QPointer<QSocketNotifier> sigAbrtNotifier{};
+	QPointer<QSocketNotifier> sigQuitNotifier{};
 #endif
 
 private slots:
 	void commitData(QSessionManager &manager);
-	void addLogLine(int logLevel, const QString &message);
 	void themeFileChanged(const QString &);
 	void applicationShutdown() noexcept;
 
@@ -196,39 +204,52 @@ public:
 
 	inline void IncrementSleepInhibition()
 	{
-		if (!sleepInhibitor)
+		if (!sleepInhibitor) {
 			return;
-		if (sleepInhibitRefs++ == 0)
+		}
+		if (sleepInhibitRefs++ == 0) {
 			os_inhibit_sleep_set_active(sleepInhibitor, true);
+		}
 	}
 
 	inline void DecrementSleepInhibition()
 	{
-		if (!sleepInhibitor)
+		if (!sleepInhibitor) {
 			return;
-		if (sleepInhibitRefs == 0)
+		}
+		if (sleepInhibitRefs == 0) {
 			return;
-		if (--sleepInhibitRefs == 0)
+		}
+		if (--sleepInhibitRefs == 0) {
 			os_inhibit_sleep_set_active(sleepInhibitor, false);
+		}
 	}
 
 	inline void PushUITranslation(obs_frontend_translate_ui_cb cb) { translatorHooks.emplace_front(cb); }
 
 	inline void PopUITranslation() { translatorHooks.pop_front(); }
 #ifndef _WIN32
-	static void SigIntSignalHandler(int);
-	static void SigTermSignalHandler(int);
+	static void sigIntSignalHandler(int);
+	static void sigTermSignalHandler(int);
+	static void sigAbrtSignalHandler(int);
+	static void sigQuitSignalHandler(int);
 #endif
 
-	void loadAppModules(struct obs_module_failure_info &mfi);
+	void loadAppModules();
+
+	ThumbnailManager *thumbnails() const { return thumbnailManager; }
 
 	// Plugin Manager Accessors
 	void pluginManagerOpenDialog();
+	void handlePluginLoadState();
 
 public slots:
+	void addLogLine(int logLevel, const QString &message);
 	void Exec(VoidFunc func);
-	void ProcessSigInt();
-	void ProcessSigTerm();
+	void processSigInt();
+	void processSigTerm();
+	void processSigAbrt();
+	void processSigQuit();
 
 signals:
 	void logLineAdded(int logLevel, const QString &message);
