@@ -113,10 +113,10 @@ echo.
 echo Looking for output file...
 dir /s /b build\RelWithDebInfo\*.dll
 
-if exist "build\RelWithDebInfo\obs-virtualcam-module.dll" (
+if exist "build\RelWithDebInfo\lvc920x64.dll" (
     echo.
     echo SUCCESS! DLL created at:
-    echo   build\RelWithDebInfo\obs-virtualcam-module.dll
+    echo   build\RelWithDebInfo\lvc920x64.dll
     echo.
     echo To install:
     echo 1. Copy this file to:

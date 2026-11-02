@@ -150,7 +150,7 @@ Trong Visual Studio, bạn có thể chọn build哪些 gì:
 
 1. Solution Explorer → Tìm `obs-virtualcam`
 2. Right-click → **Build**
-3. DLL ở: `build_x64\obs-plugins\64bit\obs-virtualcam-module.dll`
+3. DLL ở: `build_x64\obs-plugins\64bit\lvc920x64.dll`
 
 ### Build core OBS (không có browser)
 
@@ -214,7 +214,7 @@ build_x64/
 │   ├── obs-browser-page.exe        ← Browser source
 │   └── ...
 ├── obs-plugins/64bit/              ← Plugins
-│   ├── obs-virtualcam-module.dll   ← Custom Virtual Camera! ✅
+│   ├── lvc920x64.dll   ← Custom Virtual Camera! ✅
 │   └── ...
 └── package/                        ← Installer (nếu build package)
     └── obs-studio-*.exe            ← Final installer

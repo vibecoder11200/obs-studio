@@ -1,8 +1,9 @@
 #include <windows.h>
 #include "shared-memory-queue.h"
+#include "virtualcam-names.h"
 #include "tiny-nv12-scale.h"
 
-#define VIDEO_NAME L"OBSVirtualCamVideo"
+#define VIDEO_NAME VIRTUALCAM_QUEUE_NAME_W
 
 enum queue_type {
 	SHARED_QUEUE_TYPE_VIDEO,

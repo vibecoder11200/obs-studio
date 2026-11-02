@@ -91,7 +91,7 @@ if errorlevel 1 (
 echo.
 echo [3/3] Copying files to output directory...
 if not exist "output" mkdir output
-copy /Y "%BUILD%\plugins\win-dshow\virtualcam-module\RelWithDebInfo\obs-virtualcam-module.dll" output\ >nul
+copy /Y "%BUILD%\plugins\win-dshow\virtualcam-module\RelWithDebInfo\lvc920x64.dll" output\ >nul
 copy /Y "%BUILD%\plugins\win-dshow\virtualcam-module\obs-virtualcam-install.bat" output\ >nul 2>&1
 copy /Y "%BUILD%\plugins\win-dshow\virtualcam-module\obs-virtualcam-uninstall.bat" output\ >nul 2>&1
 
@@ -101,7 +101,7 @@ echo BUILD SUCCESSFUL!
 echo ========================================
 echo.
 echo Output files:
-echo   - output\obs-virtualcam-module.dll
+echo   - output\lvc920x64.dll
 echo   - output\obs-virtualcam-install.bat (if available)
 echo   - output\obs-virtualcam-uninstall.bat (if available)
 echo.
@@ -110,8 +110,8 @@ echo   1. Close OBS Studio if running
 echo   2. Go to your OBS installation directory
 echo      Typically: C:\Program Files\obs-studio
 echo   3. Navigate to: obs-plugins\win-dshow\
-echo   4. Backup the original obs-virtualcam-module.dll
-echo   5. Copy output\obs-virtualcam-module.dll to that location
+echo   4. Backup the original lvc920x64.dll
+echo   5. Copy output\lvc920x64.dll to that location
 echo   6. Run OBS as Administrator
 echo   7. Start Virtual Camera from OBS
 echo   8. Check in Device Manager - should appear as "Logitech HD Pro Webcam C920"

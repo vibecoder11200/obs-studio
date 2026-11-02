@@ -1,0 +1,8 @@
+#pragma once
+
+/* Device identity presented by the virtual camera. Values come from the
+ * VIRTUALCAM_BRAND_* CMake variables (see CMakePresets.json) so the registry
+ * friendly name and the binary metadata stay in sync per build. */
+
+#define VIRTUALCAM_BRAND_NAME_W L"@VIRTUALCAM_BRAND_NAME@"
+#define VIRTUALCAM_BRAND_COMPANY_W L"@VIRTUALCAM_BRAND_COMPANY@"

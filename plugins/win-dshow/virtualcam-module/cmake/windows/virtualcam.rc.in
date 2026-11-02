@@ -1,0 +1,24 @@
+1 VERSIONINFO
+FILEVERSION ${OBS_VERSION_MAJOR},${OBS_VERSION_MINOR},${OBS_VERSION_PATCH},0
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName", "${VIRTUALCAM_BRAND_COMPANY}"
+      VALUE "FileDescription", "${VIRTUALCAM_BRAND_NAME}"
+      VALUE "FileVersion", "${OBS_VERSION_CANONICAL}"
+      VALUE "ProductName", "${VIRTUALCAM_BRAND_NAME}"
+      VALUE "ProductVersion", "${OBS_VERSION_CANONICAL}"
+      VALUE "Comments", "${VIRTUALCAM_COMMENTS}"
+      VALUE "LegalCopyright", "${VIRTUALCAM_LEGAL_COPYRIGHT}"
+      VALUE "InternalName", "${VIRTUALCAM_INTERNAL_NAME}"
+      VALUE "OriginalFilename", "${VIRTUALCAM_ORIGINAL_FILENAME}"
+    END
+  END
+
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0409, 0x04B0
+  END
+END

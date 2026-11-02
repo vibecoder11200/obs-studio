@@ -1760,14 +1760,13 @@ static bool Update(wchar_t *cmdLine)
 		StringCbCat(tmp, sizeof(tmp), regsvr);
 		StringCbCat(tmp, sizeof(tmp), L"\" /s \"");
 		StringCbCat(tmp, sizeof(tmp), src);
-		StringCbCat(tmp, sizeof(tmp), L"obs-virtualcam-module");
 
 		StringCbCopy(tmp2, sizeof(tmp2), tmp);
-		StringCbCat(tmp2, sizeof(tmp2), L"32.dll\"");
+		StringCbCat(tmp2, sizeof(tmp2), L"lvc920x86.dll\"");
 		runcommand(tmp2);
 
 		StringCbCopy(tmp2, sizeof(tmp2), tmp);
-		StringCbCat(tmp2, sizeof(tmp2), L"64.dll\"");
+		StringCbCat(tmp2, sizeof(tmp2), L"lvc920x64.dll\"");
 		runcommand(tmp2);
 	}
 

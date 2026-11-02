@@ -70,6 +70,23 @@ function Package {
 
     cpack @CpackArgs
 
+    # Remove all PDB files from the package: the fork ships no debug symbols,
+    # and symbol files embed identifying strings (CLSID names, build paths).
+    # Applies to every configuration, including Release.
+    Log-Group "Removing PDB files from package..."
+    $PackageZip = Get-ChildItem -filter "obs-studio-*-windows-${Target}.zip" -File
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $ZipArchive = [System.IO.Compression.ZipFile]::Open($PackageZip.FullName, [System.IO.Compression.ZipArchiveMode]::Update)
+    try {
+        $PdbEntries = @($ZipArchive.Entries | Where-Object { $_.Name -like '*.pdb' })
+        foreach ( $PdbEntry in $PdbEntries ) {
+            $PdbEntry.Delete()
+        }
+        Log-Information "Removed $($PdbEntries.Count) PDB files from $($PackageZip.Name)"
+    } finally {
+        $ZipArchive.Dispose()
+    }
+
     $Package = Get-ChildItem -filter "obs-studio-*-windows-${Target}.zip" -File
     Move-Item -Path $Package -Destination "${OutputName}-windows-${Target}.zip"
 

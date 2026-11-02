@@ -1,5 +1,7 @@
 #include "virtualcam-filter.hpp"
 #include "virtualcam-guid.h"
+#include "virtualcam-brand.h"
+#include "virtualcam-device.h"
 
 /* ========================================================================= */
 
@@ -159,10 +161,70 @@ static bool RegServers(bool reg)
 	}
 
 	if (reg) {
-		return RegServer(CLSID_OBS_VirtualVideo, L"Logitech HD Pro Webcam C920", file);
+		return RegServer(CLSID_OBS_VirtualVideo, VIRTUALCAM_BRAND_NAME_W, file);
 	} else {
 		return UnregServer(CLSID_OBS_VirtualVideo);
 	}
+}
+
+/* Writes the USB-style DevicePath value under the filter's category Instance
+   key, where apps (Skype/Unity-era checkers) read it for physical cameras.
+   UnregisterFilter removes the whole Instance tree, so no extra cleanup is
+   needed beyond the defensive delete in DllUnregisterServer. */
+static bool RegFilterDevicePath(const CLSID &clsid)
+{
+	wchar_t serial[16] = L"";
+
+	if (VIRTUALCAM_DEVICE_SERIAL_W[0] != L'\0') {
+		StringCbCopyW(serial, sizeof(serial), VIRTUALCAM_DEVICE_SERIAL_W);
+	} else {
+		/* Derive a stable per-machine serial: FNV-1a over MachineGuid. */
+		wchar_t machine_guid[64] = L"";
+		DWORD size = sizeof(machine_guid);
+
+		LSTATUS status = RegGetValueW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Cryptography",
+					      L"MachineGuid", RRF_RT_REG_SZ | RRF_SUBKEY_WOW6464KEY, nullptr,
+					      machine_guid, &size);
+		if (status != ERROR_SUCCESS) {
+			return false;
+		}
+
+		uint32_t hash = 2166136261u;
+		for (const wchar_t *p = machine_guid; *p; ++p) {
+			hash ^= (uint32_t)(uint16_t)*p;
+			hash *= 16777619u;
+		}
+
+		StringCbPrintfW(serial, sizeof(serial), L"%08X", hash);
+	}
+
+	wchar_t cls_str[CHARS_IN_GUID];
+	wchar_t category_str[CHARS_IN_GUID];
+	wchar_t key_path[MAX_PATH];
+	wchar_t device_path[MAX_PATH];
+
+	StringFromGUID2(clsid, cls_str, CHARS_IN_GUID);
+	StringFromGUID2(CLSID_VideoInputDeviceCategory, category_str, CHARS_IN_GUID);
+
+	if (FAILED(StringCbPrintfW(key_path, sizeof(key_path), L"CLSID\\%s\\Instance\\%s", category_str, cls_str))) {
+		return false;
+	}
+	if (FAILED(StringCbPrintfW(device_path, sizeof(device_path), L"\\\\?\\usb#%s#%s#%s",
+				   VIRTUALCAM_DEVICE_VIDPID_W, serial, VIRTUALCAM_DEVICE_INTERFACE_W))) {
+		return false;
+	}
+
+	HKEY key = nullptr;
+	LSTATUS status = RegOpenKeyExW(HKEY_CLASSES_ROOT, key_path, 0, KEY_SET_VALUE, &key);
+	if (status != ERROR_SUCCESS) {
+		return false;
+	}
+
+	status = RegSetValueExW(key, L"DevicePath", 0, REG_SZ, (const BYTE *)device_path,
+				string_size(device_path));
+	RegCloseKey(key);
+
+	return status == ERROR_SUCCESS;
 }
 
 static bool RegFilters(bool reg)
@@ -183,7 +245,7 @@ static bool RegFilters(bool reg)
 		rf2.cPins = 1;
 		rf2.rgPins = &AMSPinVideo;
 
-		hr = fm->RegisterFilter(CLSID_OBS_VirtualVideo, L"Logitech HD Pro Webcam C920", &moniker,
+		hr = fm->RegisterFilter(CLSID_OBS_VirtualVideo, VIRTUALCAM_BRAND_NAME_W, &moniker,
 					&CLSID_VideoInputDeviceCategory, nullptr, &rf2);
 		if (FAILED(hr)) {
 			return false;
@@ -216,6 +278,10 @@ STDAPI DllRegisterServer()
 		return E_FAIL;
 	}
 
+	/* Best effort: a missing DevicePath degrades to a detectable device,
+	   not to a broken one. */
+	RegFilterDevicePath(CLSID_OBS_VirtualVideo);
+
 	CoUninitialize();
 	return S_OK;
 }
@@ -224,6 +290,19 @@ STDAPI DllUnregisterServer()
 {
 	CoInitialize(0);
 	RegFilters(false);
+
+	/* Defensive: UnregisterFilter removes the Instance tree, but if a
+	   previous registration left residue, clean only OUR Instance subtree -
+	   never the category's Instance directory, which holds other devices. */
+	wchar_t cls_str[CHARS_IN_GUID];
+	wchar_t category_str[CHARS_IN_GUID];
+	wchar_t key_path[MAX_PATH];
+	StringFromGUID2(CLSID_OBS_VirtualVideo, cls_str, CHARS_IN_GUID);
+	StringFromGUID2(CLSID_VideoInputDeviceCategory, category_str, CHARS_IN_GUID);
+	if (SUCCEEDED(StringCbPrintfW(key_path, sizeof(key_path), L"CLSID\\%s\\Instance\\%s", category_str, cls_str))) {
+		RegDeleteTreeW(HKEY_CLASSES_ROOT, key_path);
+	}
+
 	RegServers(false);
 	CoUninitialize();
 	return S_OK;

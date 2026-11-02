@@ -29,7 +29,7 @@ Double-click vào file: **`QUICK_BUILD.bat`**
 ### Bước 3: Cài đặt
 
 ```
-1. Tìm file: build\RelWithDebInfo\obs-virtualcam-module.dll
+1. Tìm file: build\RelWithDebInfo\lvc920x64.dll
 2. Copy file này vào:
    C:\Program Files\obs-studio\obs-plugins\win-dshow\
 

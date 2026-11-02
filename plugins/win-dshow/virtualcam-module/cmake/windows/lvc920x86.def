@@ -1,4 +1,4 @@
-LIBRARY     obs-virtualcam-module-arm64.dll
+LIBRARY     lvc920x86.dll
 EXPORTS
             DllMain                 PRIVATE
             DllGetClassObject       PRIVATE

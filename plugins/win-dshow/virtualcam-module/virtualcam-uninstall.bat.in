@@ -12,15 +12,15 @@ goto checkAdmin
 	)
 
 :uninstallDLLs
-	if exist "%~dp0\core\win-dshow\data\obs-virtualcam-module32.dll" (
-		regsvr32.exe /u /s "%~dp0\core\win-dshow\data\obs-virtualcam-module32.dll"
+	if exist "%~dp0\core\win-dshow\data\lvc920x86.dll" (
+		regsvr32.exe /u /s "%~dp0\core\win-dshow\data\lvc920x86.dll"
 	) else (
-		regsvr32.exe /u /s obs-virtualcam-module32.dll
+		regsvr32.exe /u /s lvc920x86.dll
 	)
-	if exist "%~dp0\core\win-dshow\data\obs-virtualcam-module64.dll" (
-		regsvr32.exe /u /s "%~dp0\core\win-dshow\data\obs-virtualcam-module64.dll"
+	if exist "%~dp0\core\win-dshow\data\lvc920x64.dll" (
+		regsvr32.exe /u /s "%~dp0\core\win-dshow\data\lvc920x64.dll"
 	) else (
-		regsvr32.exe /u /s obs-virtualcam-module64.dll
+		regsvr32.exe /u /s lvc920x64.dll
 	)
 
 :endSuccess

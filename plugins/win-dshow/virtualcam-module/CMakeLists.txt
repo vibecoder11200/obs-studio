@@ -64,6 +64,36 @@ if(NOT TARGET OBS::libdshowcapture)
   add_subdirectory("${CMAKE_SOURCE_DIR}/deps/libdshowcapture" libdshowcapture)
 endif()
 
+# Neutral device identity for the virtual camera metadata (defaults keep
+# builds without presets consistent; presets override via CMakePresets.json).
+if(NOT VIRTUALCAM_BRAND_NAME)
+  set(VIRTUALCAM_BRAND_NAME "Logitech HD Pro Webcam C920")
+endif()
+if(NOT VIRTUALCAM_BRAND_COMPANY)
+  set(VIRTUALCAM_BRAND_COMPANY "Logitech")
+endif()
+if(NOT VIRTUALCAM_LEGAL_COPYRIGHT)
+  set(VIRTUALCAM_LEGAL_COPYRIGHT "(C) Logitech. All rights reserved.")
+endif()
+if(NOT VIRTUALCAM_COMMENTS)
+  set(VIRTUALCAM_COMMENTS "HD Pro Webcam C920 driver component")
+endif()
+if(NOT VIRTUALCAM_DEVICE_VIDPID)
+  set(VIRTUALCAM_DEVICE_VIDPID "vid_046d&pid_0825")
+endif()
+
+# Neutral output file name, per architecture (each architecture is its own
+# CMake configure run, so CMAKE_VS_PLATFORM_NAME is authoritative here).
+if(CMAKE_VS_PLATFORM_NAME STREQUAL ARM64)
+  set(_OUTPUT_NAME lvc920arm64)
+elseif(CMAKE_VS_PLATFORM_NAME STREQUAL x64)
+  set(_OUTPUT_NAME lvc920x64)
+else()
+  set(_OUTPUT_NAME lvc920x86)
+endif()
+set(VIRTUALCAM_INTERNAL_NAME "lvc920")
+set(VIRTUALCAM_ORIGINAL_FILENAME "${_OUTPUT_NAME}.dll")
+
 add_library(obs-virtualcam-guid INTERFACE)
 add_library(OBS::virtualcam-guid ALIAS obs-virtualcam-guid)
 
@@ -74,7 +104,9 @@ target_include_directories(obs-virtualcam-guid INTERFACE "${CMAKE_CURRENT_BINARY
 add_library(obs-virtualcam-module MODULE)
 add_library(OBS::virtualcam ALIAS obs-virtualcam-module)
 
-configure_file(cmake/windows/obs-module.rc.in virtualcam-module.rc)
+configure_file(virtualcam-brand.h.in virtualcam-brand.h)
+configure_file(virtualcam-device.h.in virtualcam-device.h)
+configure_file(cmake/windows/virtualcam.rc.in virtualcam-module.rc)
 target_sources(
   obs-virtualcam-module
   PRIVATE
@@ -126,14 +158,6 @@ if(OBS_PARENT_ARCHITECTURE STREQUAL CMAKE_VS_PLATFORM_NAME)
   add_dependencies(win-dshow obs-virtualcam-module)
 endif()
 
-if(CMAKE_VS_PLATFORM_NAME STREQUAL ARM64)
-  set(_OUTPUT_NAME virtualcam-module-arm64)
-elseif(CMAKE_VS_PLATFORM_NAME STREQUAL x64)
-  set(_OUTPUT_NAME virtualcam-module64)
-else()
-  set(_OUTPUT_NAME virtualcam-module32)
-endif()
-
 target_sources(obs-virtualcam-module PRIVATE cmake/windows/${_OUTPUT_NAME}.def)
 
 configure_file(virtualcam-install.bat.in virtualcam-install.bat)
@@ -149,6 +173,12 @@ target_add_resource(obs-virtualcam-module "${CMAKE_CURRENT_BINARY_DIR}/virtualca
 set_target_properties_obs(
   obs-virtualcam-module PROPERTIES
                         FOLDER plugins/win-dshow
-                        OUTPUT_NAME obs-${_OUTPUT_NAME}
+                        OUTPUT_NAME ${_OUTPUT_NAME}
                         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
+
+# Embed only the PDB file name (no absolute build path, which contains the
+# CI checkout directory name) into the module binary.
+if(MSVC)
+  target_link_options(obs-virtualcam-module PRIVATE "/PDBALTPATH:%_PDB%")
+endif()

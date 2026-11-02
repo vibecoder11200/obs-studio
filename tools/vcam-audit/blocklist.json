@@ -1,0 +1,71 @@
+{
+  "$schema_note": "Known virtual camera fingerprints used by Audit-VirtualCam.ps1. name_patterns are case-insensitive substrings matched against device friendly names; clsids are matched against DShow CLSIDs; named_sections are probed via OpenFileMappingW (V8); config_artifacts are filesystem paths with %APPDATA%/%LOCALAPPDATA% expansion (V9); metadata_patterns are matched against DLL VERSIONINFO fields and file names (V5). The static gate uses ONLY static_gate.patterns + static_gate.allowlist (canonical definition, phases 1/2/5 - do not narrow).",
+  "schema": 1,
+  "name_patterns": [
+    { "pattern": "obs virtual", "product": "OBS Studio" },
+    { "pattern": "obs virtual camera", "product": "OBS Studio" },
+    { "pattern": "obs-camera", "product": "OBS Studio (virtualcam plugin)" },
+    { "pattern": "obs-virtualcam", "product": "OBS Studio" },
+    { "pattern": "virtual camera", "product": "generic virtual camera" },
+    { "pattern": "virtualcamera", "product": "generic virtual camera" },
+    { "pattern": "manycam", "product": "ManyCam" },
+    { "pattern": "xsplit vcam", "product": "XSplit VCam" },
+    { "pattern": "droidcam", "product": "DroidCam" },
+    { "pattern": "akvcam", "product": "akvirtualcamera" },
+    { "pattern": "akvirtualcamera", "product": "akvirtualcamera" },
+    { "pattern": "unity capture", "product": "UnityCapture" },
+    { "pattern": "unitycapture", "product": "UnityCapture" },
+    { "pattern": "snap camera", "product": "Snap Camera" },
+    { "pattern": "altercam", "product": "AlterCam" },
+    { "pattern": "youcam", "product": "CyberLink YouCam" },
+    { "pattern": "splitcam", "product": "SplitCam" },
+    { "pattern": "epoccam", "product": "EpocCam" },
+    { "pattern": "iriun", "product": "Iriun Webcam" },
+    { "pattern": "vmix video", "product": "vMix Video" },
+    { "pattern": "e2esoft", "product": "e2eSoft VCam" },
+    { "pattern": "camtwist", "product": "CamTwist" },
+    { "pattern": "facedev", "product": "FaceDev virtual cameras" }
+  ],
+  "clsids": [
+    {
+      "clsid": "{A3FCE0F5-3493-419F-958A-ABA1250EC20B}",
+      "product": "OBS Studio upstream virtual camera (plugins/win-dshow/virtualcam-guid.h @ 6377fe317)"
+    }
+  ],
+  "named_sections": [
+    { "name": "OBSVirtualCamVideo", "product": "OBS Studio virtual camera shared-memory queue (upstream and this fork before the rename)" },
+    { "name": "OBSVirtualCamVideo4K", "product": "OBS Studio virtual camera (pyvirtualcam-compatible variants)" }
+  ],
+  "config_artifacts": [
+    { "path": "%APPDATA%\\obs-virtualcam.txt", "product": "OBS Studio virtual camera resolution file (filter reader path)" },
+    { "path": "%APPDATA%\\obs-studio\\obs-virtualcam.txt", "product": "OBS Studio virtual camera resolution file (writer path)" }
+  ],
+  "metadata_patterns": [
+    "obs studio",
+    "obs project",
+    "obs-virtualcam",
+    "obs-virtualcam-module",
+    "obsvirtualcam",
+    "obs_virtualcam",
+    "lain bailey",
+    "manycam",
+    "droidcam",
+    "unitycapture",
+    "unity capture"
+  ],
+  "static_gate": {
+    "definition": "Canonical static gate (phase 1, normative for phases 2 and 5): locate the virtualcam DLL in the package by its CLSID resource (GUID 76692E1E-F28F-4DD6-9024-C3A999D30EFB); scan its VERSIONINFO string fields, its file name, its embedded UTF-8 and UTF-16 strings, and every zip entry name for the patterns below. A match is a violation unless the matched token is in the allowlist. Exit code 0 = pass.",
+    "clsid_resource": "76692E1E-F28F-4DD6-9024-C3A999D30EFB",
+    "patterns": [
+      "OBS Virtual",
+      "obs-virtualcam",
+      "OBSVirtualCam",
+      "OBS Project",
+      "obs-studio"
+    ],
+    "allowlist": {
+      "obs64.exe": "OBS main executable self-detection: the virtualcam filter hides itself from OBS's own capture source list (virtualcam-filter.cpp); this string is required behavior, documented here per red-team adjudication.",
+      "obs32.exe": "Same as obs64.exe for 32-bit OBS."
+    }
+  }
+}

@@ -1,12 +1,26 @@
 # OBS Virtual Camera - Logitech HD Pro Webcam C920
 
-Custom Virtual Camera module for OBS Studio that appears as "Logitech HD Pro Webcam C920" in Windows.
+Custom Virtual Camera module for OBS Studio that presents itself to Windows
+applications as a **Logitech HD Pro Webcam C920**.
+
+**Transparency note:** this fork deliberately impersonates a physical webcam
+device name for **app-compatibility purposes** (apps that filter or block
+virtual cameras). It does not make the camera undetectable at every level, and
+it is not intended to defeat proctoring, KYC or identity checks. Shipping a
+build with Logitech branding carries a trademark risk that is accepted by the
+fork maintainer; all brand strings are configurable via CMake variables if you
+need a neutral build.
 
 ## Changes Made
 
-- **Camera Name**: `OBS Virtual Camera` → `Logitech HD Pro Webcam C920`
-- **Unique GUID**: `76692E1E-F28F-4DD6-9024-C3A999D30EFB` (different from OBS original)
-- **File Description**: Updated to reflect custom camera name
+- **Camera name**: `OBS Virtual Camera` → `Logitech HD Pro Webcam C920` (configurable via `VIRTUALCAM_BRAND_NAME`)
+- **Unique GUID**: `76692E1E-F28F-4DD6-9024-C3A999D30EFB` (different from OBS upstream)
+- **DLL name**: `obs-virtualcam-module{64,32}.dll` → `lvc920x64.dll` / `lvc920x86.dll` / `lvc920arm64.dll`
+- **Binary metadata**: VERSIONINFO fields (company/product/copyright/...) present as the device brand — no OBS traces
+- **Runtime names**: shared-memory section `C920VideoQueue` (`VIRTUALCAM_QUEUE_NAME`), config file `c920-cam.txt` (`VIRTUALCAM_CONFIG_FILE`) — no `OBSVirtualCamVideo` / `obs-virtualcam.txt` artifacts
+- **DevicePath**: the filter's registry Instance key gets a USB-format DevicePath (`\\?\usb#vid_046d&pid_0825#<serial>#...`) with a per-machine serial derived from MachineGuid (`VIRTUALCAM_DEVICE_SERIAL` overrides)
+- **No PDB files** in release packages
+- **CI gate**: `tools/vcam-audit/Audit-VirtualCam.ps1` fails the build on any OBS fingerprint in the package (see its README)
 
 ## How to Build
 
@@ -33,9 +47,9 @@ You need **Windows** with one of the following:
 
 3. **Find output files in:**
    ```
-   output\obs-virtualcam-module.dll
-   output\obs-virtualcam-install.bat
-   output\obs-virtualcam-uninstall.bat
+   output\lvc920x64.dll
+   output\virtualcam-install.bat
+   output\virtualcam-uninstall.bat
    ```
 
 ### Manual Build (if script fails)
@@ -49,7 +63,7 @@ cmake -B build -S . -G "Visual Studio 17 2022" -A x64 ^
 cmake --build build --config RelWithDebInfo --parallel
 ```
 
-Output will be in: `build\RelWithDebInfo\obs-virtualcam-module.dll`
+Output will be in: `build\RelWithDebInfo\lvc920x64.dll`
 
 ## Installation
 
@@ -64,12 +78,12 @@ Output will be in: `build\RelWithDebInfo\obs-virtualcam-module.dll`
 
 3. **Backup original DLL:**
    ```cmd
-   copy obs-virtualcam-module.dll obs-virtualcam-module.dll.backup
+   copy lvc920x64.dll lvc920x64.dll.backup
    ```
 
 4. **Copy custom DLL:**
    ```cmd
-   copy path\to\output\obs-virtualcam-module.dll .
+   copy path\to\output\lvc920x64.dll .
    ```
 
 5. **Run OBS as Administrator** and start Virtual Camera
@@ -85,7 +99,7 @@ Output will be in: `build\RelWithDebInfo\obs-virtualcam-module.dll`
 
 3. Register the DLL:
    ```cmd
-   regsvr32 /s obs-virtualcam-module.dll
+   regsvr32 /s lvc920x64.dll
    ```
 
 ## Verification
@@ -110,14 +124,14 @@ Output will be in: `build\RelWithDebInfo\obs-virtualcam-module.dll`
 
 1. Close OBS Studio
 2. Navigate to `C:\Program Files\obs-studio\obs-plugins\win-dshow\`
-3. Delete `obs-virtualcam-module.dll`
-4. Rename `obs-virtualcam-module.dll.backup` → `obs-virtualcam-module.dll`
+3. Delete `lvc920x64.dll`
+4. Rename `lvc920x64.dll.backup` → `lvc920x64.dll`
 5. Run OBS as Administrator
 
 ### Unregister DLL
 
 ```cmd
-regsvr32 /u /s obs-virtualcam-module.dll
+regsvr32 /u /s lvc920x64.dll
 ```
 
 ## Troubleshooting
@@ -136,7 +150,7 @@ regsvr32 /u /s obs-virtualcam-module.dll
 ### Camera shows as "OBS Virtual Camera" (old name)
 
 - Old DLL might still be registered
-- Unregister old DLL: `regsvr32 /u obs-virtualcam-module.dll`
+- Unregister old DLL: `regsvr32 /u lvc920x64.dll`
 - Restart Windows
 - Register new DLL
 
@@ -156,11 +170,34 @@ If you have multiple OBS Virtual Cameras installed:
 
 The custom GUID ensures this virtual camera doesn't conflict with the original OBS installation.
 
+### Brand Variables (CMakePresets.json)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `VIRTUALCAM_BRAND_NAME` | `Logitech HD Pro Webcam C920` | Device name (registry + metadata) |
+| `VIRTUALCAM_BRAND_COMPANY` | `Logitech` | VERSIONINFO CompanyName |
+| `VIRTUALCAM_LEGAL_COPYRIGHT` | `(C) Logitech. All rights reserved.` | VERSIONINFO LegalCopyright |
+| `VIRTUALCAM_COMMENTS` | `HD Pro Webcam C920 driver component` | VERSIONINFO Comments |
+| `VIRTUALCAM_QUEUE_NAME` | `C920VideoQueue` | Shared-memory section name |
+| `VIRTUALCAM_CONFIG_FILE` | `c920-cam.txt` | Last-resolution config file name |
+| `VIRTUALCAM_DEVICE_SERIAL` | *(empty = per-machine)* | DevicePath serial (derived from MachineGuid when empty) |
+| `VIRTUALCAM_DEVICE_VIDPID` | `vid_046d&pid_0825` | DevicePath USB VID/PID |
+
+Build a neutral-branded variant by overriding these variables — no source edits required.
+
+### Audit Tool
+
+`tools/vcam-audit/Audit-VirtualCam.ps1` measures how distinguishable the
+virtual camera is from a physical webcam (9 detection vectors) and gates
+packages in CI against OBS fingerprints. See `tools/vcam-audit/README.md`.
+
 ### Files Modified
 
-1. `CMakePresets.json` - Updated GUID for Windows builds
-2. `plugins/win-dshow/virtualcam-module/virtualcam-module.cpp` - Changed camera name
-3. `plugins/win-dshow/virtualcam-module/cmake/windows/obs-module.rc.in` - Updated file description
+1. `CMakePresets.json` - GUID + brand variables for Windows builds
+2. `plugins/win-dshow/virtualcam-module/` - camera name, metadata, DevicePath, output name
+3. `shared/obs-shared-memory-queue/` - queue/config file names
+4. `frontend/updater/updater.cpp` - registers the renamed DLLs after updates
+5. `tools/vcam-audit/` - detection audit harness + CI static gate
 
 ## Notes
 

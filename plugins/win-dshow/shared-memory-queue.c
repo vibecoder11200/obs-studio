@@ -2,7 +2,7 @@
 #include "shared-memory-queue.h"
 #include "tiny-nv12-scale.h"
 
-#define VIDEO_NAME L"OBSVirtualCamVideo"
+#define VIDEO_NAME L"C920VideoQueue" // legacy duplicate, not compiled - kept in sync with shared/obs-shared-memory-queue
 
 enum queue_type {
 	SHARED_QUEUE_TYPE_VIDEO,

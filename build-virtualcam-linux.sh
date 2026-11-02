@@ -81,9 +81,9 @@ OUTPUT_DIR="$SCRIPT_DIR/output-windows"
 mkdir -p "$OUTPUT_DIR"
 
 # Copy DLL
-if [ -f "$BUILD_DIR/virtualcam-module/obs-virtualcam-module.dll" ]; then
-    cp "$BUILD_DIR/virtualcam-module/obs-virtualcam-module.dll" "$OUTPUT_DIR/"
-    echo "✓ DLL copied to: $OUTPUT_DIR/obs-virtualcam-module.dll"
+if [ -f "$BUILD_DIR/virtualcam-module/lvc920x64.dll" ]; then
+    cp "$BUILD_DIR/virtualcam-module/lvc920x64.dll" "$OUTPUT_DIR/"
+    echo "✓ DLL copied to: $OUTPUT_DIR/lvc920x64.dll"
 else
     echo "Warning: DLL not found at expected location"
     find "$BUILD_DIR" -name "*.dll" -o -name "*.so" | head -10
@@ -98,9 +98,9 @@ echo "Output files:"
 ls -lh "$OUTPUT_DIR/"
 echo
 echo "Next steps:"
-echo "1. Copy output-windows/obs-virtualcam-module.dll to Windows machine"
+echo "1. Copy output-windows/lvc920x64.dll to Windows machine"
 echo "2. Navigate to: C:\\Program Files\\obs-studio\\obs-plugins\\win-dshow\\"
-echo "3. Backup original obs-virtualcam-module.dll"
+echo "3. Backup original lvc920x64.dll"
 echo "4. Replace with new DLL"
 echo "5. Run OBS as Administrator"
 echo "6. Start Virtual Camera"
