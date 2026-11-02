@@ -73,6 +73,7 @@ jobs:
           if ( $files.Count -eq 0 ) {
             throw "No package zip found for release upload."
           }
+          $zipPath = $files[0].FullName
 
           gh release view $tag --repo ${Env:GITHUB_REPOSITORY} *> $null
           if ( $LASTEXITCODE -ne 0 ) {
@@ -80,7 +81,7 @@ jobs:
               --repo ${Env:GITHUB_REPOSITORY} `
               --title "OBS Studio ${tag}" `
               --notes "OBS Studio **${tag}** — fork with the Virtual Camera registered as **Logitech HD Pro Webcam C920** (GUID 76692E1E-F28F-4DD6-9024-C3A999D30EFB). Based on upstream obsproject/obs-studio. Windows x64 portable build — unzip and run, then use Start Virtual Camera." `
-              ${files.FullName}
+              $zipPath
           } else {
-            gh release upload $tag --repo ${Env:GITHUB_REPOSITORY} --clobber ${files.FullName}
+            gh release upload $tag --repo ${Env:GITHUB_REPOSITORY} --clobber $zipPath
           }
