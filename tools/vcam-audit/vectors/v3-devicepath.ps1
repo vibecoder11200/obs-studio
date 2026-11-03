@@ -3,7 +3,9 @@
 # passes here. Whether it resolves to a real devnode is V4's job.
 function Get-V3Vector {
 	param($Inventory, $Blocklist)
-	$usbPattern = '^\\\\\?\\usb#vid_[0-9a-f]{4}&pid_[0-9a-f]{4}#[^#]+#\{[0-9a-f\-]{36}\}$'
+	# Genuine paths end with the interface GUID; moniker-bag values also carry
+	# a trailing symbolic-link suffix (e.g. '...\{guid}\global').
+	$usbPattern = '^\\\\\?\\usb#vid_[0-9a-f]{4}&pid_[0-9a-f]{4}(&mi_[0-9a-f]{2})?#[^#]+#\{[0-9a-f\-]{36}\}(\\global)?$'
 	foreach ($dev in $Inventory.dshow_devices) {
 		$path = $dev.devicepath_moniker
 		$source = 'moniker'

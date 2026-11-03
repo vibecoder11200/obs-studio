@@ -610,6 +610,84 @@ namespace VCamAudit
             }
             return false;
         }
+
+        public struct DeviceInfo
+        {
+            public string Moniker;
+            public string FriendlyName;
+            public string Description;
+            public string DevicePath;
+            public string CameraControls;
+        }
+
+        // The whole COM walk lives here because PowerShell 7 cannot late-bind
+        // custom-marshaled COM interfaces (IEnumMoniker has no IDispatch).
+        public static DeviceInfo[] EnumerateDShow()
+        {
+            int hrInit = CoInitializeEx(IntPtr.Zero, COINIT_APARTMENTTHREADED);
+            bool uninit = hrInit >= 0;   // S_OK/S_FALSE pair with CoUninitialize; RPC_E_CHANGED_MODE does not
+            var results = new System.Collections.Generic.List<DeviceInfo>();
+
+            try
+            {
+                ICreateDevEnum devEnum = (ICreateDevEnum)new SystemDeviceEnum();
+                Guid category = new Guid("860BB310-5D01-11D0-BD3B-00A0C911CE86");
+                IEnumMoniker enumMoniker;
+                int hr = devEnum.CreateClassEnumerator(ref category, out enumMoniker, 0);
+                if (hr != 0 || enumMoniker == null) return results.ToArray();
+
+                IBindCtx ctx = CreateBindCtx();
+                var monikers = new IMoniker[1];
+                IntPtr fetched = Marshal.AllocHGlobal(4);
+                try
+                {
+                    while (enumMoniker.Next(1, monikers, fetched) == 0)
+                    {
+                        DeviceInfo info = new DeviceInfo();
+                        IMoniker mk = monikers[0];
+                        try
+                        {
+                            info.Moniker = GetMonikerDisplayName(ctx, mk);
+
+                            object bag = GetMonikerPropertyBag(ctx, mk);
+                            if (bag != null)
+                            {
+                                info.FriendlyName = ReadPropertyBag(bag, "FriendlyName");
+                                info.Description = ReadPropertyBag(bag, "Description");
+                                info.DevicePath = ReadPropertyBag(bag, "DevicePath");
+                                Marshal.ReleaseComObject(bag);
+                            }
+
+                            // V7 best-effort: instantiate the filter, query camera controls.
+                            try
+                            {
+                                object filter = BindMonikerToObject(ctx, mk, "56A868A9-0AD4-11CE-B03A-0020AF0BA770");
+                                if (filter != null)
+                                {
+                                    info.CameraControls = ProbeCameraControls(filter);
+                                    Marshal.ReleaseComObject(filter);
+                                }
+                            }
+                            catch { info.CameraControls = "probe-error"; }
+                        }
+                        catch { }
+                        finally { Marshal.ReleaseComObject(mk); }
+                        results.Add(info);
+                    }
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(fetched);
+                    Marshal.ReleaseComObject(enumMoniker);
+                    Marshal.ReleaseComObject(devEnum);
+                }
+            }
+            finally
+            {
+                if (uninit) CoUninitialize();
+            }
+            return results.ToArray();
+        }
     }
 }
 '@
@@ -643,77 +721,36 @@ function Get-VcamInventory {
 	}
 
 	# --- DirectShow video input devices (V1/V2/V3/V5/V7 source data) ---
-	$devEnum = [VCamAudit.Native]::CreateDeviceEnum()
-	$category = [Guid]'860BB310-5D01-11D0-BD3B-00A0C911CE86'   # CLSID_VideoInputDeviceCategory
-	$enumMoniker = $null
-	$hr = [VCamAudit.Native]::CreateClassEnumerator($devEnum, [ref]$category, [ref]$enumMoniker)
-	if ($hr -eq 0 -and $enumMoniker) {
-		$bindCtx = [VCamAudit.Native]::CreateBindCtx()
-		$monikers = @($null)
-		$fetched = [Runtime.InteropServices.Marshal]::AllocHGlobal(4)
-		try {
-			while ($enumMoniker.Next(1, $monikers, $fetched) -eq 0) {
-				$mk = $monikers[0]
-				$displayName = [VCamAudit.Native]::GetMonikerDisplayName($bindCtx, $mk)
-				$clsid = ''
-				if ($displayName -match '\{([0-9A-Fa-f\-]{36})\}\s*$') { $clsid = $Matches[1] }
+	$categoryGuid = '860BB310-5D01-11D0-BD3B-00A0C911CE86'   # CLSID_VideoInputDeviceCategory
+	foreach ($dev in [VCamAudit.Native]::EnumerateDShow()) {
+		$clsid = ''
+		if ($dev.Moniker -match '\{([0-9A-Fa-f\-]{36})\}\s*$') { $clsid = $Matches[1] }
 
-				$friendlyName = $null; $description = $null; $bagPath = $null
-				$bag = $null
-				try {
-					$bag = [VCamAudit.Native]::GetMonikerPropertyBag($bindCtx, $mk)
-					if ($bag) {
-						$friendlyName = [VCamAudit.Native]::ReadPropertyBag($bag, 'FriendlyName')
-						$description = [VCamAudit.Native]::ReadPropertyBag($bag, 'Description')
-						$bagPath = [VCamAudit.Native]::ReadPropertyBag($bag, 'DevicePath')
-					}
-				} catch { } finally { if ($bag) { [Runtime.InteropServices.Marshal]::ReleaseComObject($bag) | Out-Null } }
-
-				# Registry cross-check: instance key under the device category.
-				$instancePath = "Registry::HKEY_CLASSES_ROOT\CLSID\{$category}\Instance\{$clsid}"
-				$regDevicePath = $null; $inproc = $null
-				if (Test-Path $instancePath) {
-					$ip = Get-ItemProperty -Path $instancePath -ErrorAction SilentlyContinue
-					if ($ip) { $regDevicePath = $ip.DevicePath }
-					$inprocKey = "Registry::HKEY_CLASSES_ROOT\CLSID\{$clsid}\InprocServer32"
-					if (Test-Path $inprocKey) {
-						$inproc = (Get-ItemProperty -Path $inprocKey -ErrorAction SilentlyContinue).'(default)'
-					}
-				}
-
-				# V7 best-effort: instantiate the filter and query camera controls.
-				$controls = 'not-probed'
-				try {
-					$filterObj = [VCamAudit.Native]::BindMonikerToObject($bindCtx, $mk, '56A868A9-0AD4-11CE-B03A-0020AF0BA770')   # IID_IBaseFilter
-					if ($filterObj) {
-						$controls = [VCamAudit.Native]::ProbeCameraControls($filterObj)
-						[Runtime.InteropServices.Marshal]::ReleaseComObject($filterObj) | Out-Null
-					}
-				} catch {
-					$controls = 'probe-error'
-				}
-
-				$inventory.dshow_devices += [pscustomobject]@{
-					moniker             = $displayName
-					clsid               = $clsid
-					friendly_name       = $friendlyName
-					description         = $description
-					devicepath_moniker  = $bagPath
-					devicepath_registry = $regDevicePath
-					inprocserver        = $inproc
-					camera_controls     = $controls
-				}
-				[Runtime.InteropServices.Marshal]::ReleaseComObject($mk) | Out-Null
+		# Registry cross-check: instance key under the device category.
+		$instancePath = "Registry::HKEY_CLASSES_ROOT\CLSID\{$categoryGuid}\Instance\{$clsid}"
+		$regDevicePath = $null; $inproc = $null
+		if (Test-Path $instancePath) {
+			$ip = Get-ItemProperty -Path $instancePath -ErrorAction SilentlyContinue
+			if ($ip) { $regDevicePath = $ip.DevicePath }
+			$inprocKey = "Registry::HKEY_CLASSES_ROOT\CLSID\{$clsid}\InprocServer32"
+			if (Test-Path $inprocKey) {
+				$inproc = (Get-ItemProperty -Path $inprocKey -ErrorAction SilentlyContinue).'(default)'
 			}
-		} finally {
-			[Runtime.InteropServices.Marshal]::FreeHGlobal($fetched)
-			[Runtime.InteropServices.Marshal]::ReleaseComObject($enumMoniker) | Out-Null
-			[Runtime.InteropServices.Marshal]::ReleaseComObject($devEnum) | Out-Null
 		}
-	} elseif ($hr -eq 1) {
+
+		$inventory.dshow_devices += [pscustomobject]@{
+			moniker             = $dev.Moniker
+			clsid               = $clsid
+			friendly_name       = $dev.FriendlyName
+			description         = $dev.Description
+			devicepath_moniker  = $dev.DevicePath
+			devicepath_registry = $regDevicePath
+			inprocserver        = $inproc
+			camera_controls     = $(if ($dev.CameraControls) { $dev.CameraControls } else { 'not-probed' })
+		}
+	}
+	if ($inventory.dshow_devices.Count -eq 0) {
 		Write-Status 'DirectShow video input category is empty on this machine.'
-	} else {
-		Write-Status "DirectShow enumeration failed: hr=0x$($hr.ToString('X8'))"
 	}
 
 	# --- System camera device interfaces (V3-deep/V4/V6 source data) ---
@@ -815,18 +852,18 @@ function Invoke-VcamDiff {
 	}
 	$target = $targets[0]
 
-	$baseTargets = @($baseline.dshow_devices | Where-Object { $_.clsid -ieq $TargetClsid })
+	$baseTargets = @($baseline.dshow | Where-Object { $_.clsid -ieq $TargetClsid })
 	if ($baseTargets.Count -gt 1) {
 		throw "Ambiguity: target CLSID appears $($baseTargets.Count) times in the baseline scan. Refusing to guess."
 	}
 
 	if ($RefClsid) {
-		$refs = @($baseline.dshow_devices | Where-Object { $_.clsid -ieq $RefClsid })
+		$refs = @($baseline.dshow | Where-Object { $_.clsid -ieq $RefClsid })
 		if ($refs.Count -ne 1) { throw "Reference CLSID $RefClsid matched $($refs.Count) devices in baseline; expected exactly 1." }
 		$reference = $refs[0]
 	} else {
 		# Default reference: a baseline device with a genuine USB DevicePath.
-		$refs = @($baseline.dshow_devices | Where-Object {
+		$refs = @($baseline.dshow | Where-Object {
 				($_.clsid -ine $TargetClsid) -and ($_.devicepath_moniker -match '^\\\\\?\\usb#')
 			})
 		if ($refs.Count -eq 0) {
@@ -840,14 +877,19 @@ function Invoke-VcamDiff {
 
 	$vectors = Get-VcamVectors $Inventory $Blocklist
 
-	# Join rule: per-device vectors join by CLSID (never by friendly name - the
-	# virtual camera deliberately shares the reference camera's name); the
-	# machine-level vectors (V8/V9, empty clsid) join by vector alone.
+	# Join rule: the fork target joins by CLSID. A hardware reference often
+	# has no DShow CLSID at all (its moniker is a @device:pnp: device
+	# moniker), so its baseline rows are matched by friendly name instead -
+	# safe because the ambiguity check below still throws on any duplicate
+	# match. V8/V9 are the machine-level rows.
 	$severity = @{ FAIL = 0; WARN = 1; PASS = 2 }
-	$targetRows = @($vectors | Where-Object { $_.clsid -ieq $TargetClsid })
-	$machineRows = @($vectors | Where-Object { -not $_.clsid })
-	$baseRows = @($baseline.vectors | Where-Object { $_.clsid -ieq $reference.clsid })
-	$baseMachine = @($baseline.vectors | Where-Object { -not $_.clsid })
+	$targetRows = @($vectors | Where-Object { $_.clsid -ieq $TargetClsid -and $_.vector -notin 'V8', 'V9' })
+	$machineRows = @($vectors | Where-Object { $_.vector -in 'V8', 'V9' })
+	$baseRows = @($baseline.vectors | Where-Object {
+			($_.vector -notin 'V8', 'V9') -and
+			(($_.clsid -and $_.clsid -ieq $reference.clsid) -or (-not $_.clsid -and $_.device -eq $reference.friendly_name))
+		})
+	$baseMachine = @($baseline.vectors | Where-Object { $_.vector -in 'V8', 'V9' })
 
 	$comparison = [System.Collections.Generic.List[object]]::new()
 	foreach ($vectorId in @('V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9')) {
@@ -858,15 +900,20 @@ function Invoke-VcamDiff {
 		}
 		$tv = if ($t.Count) { $t[0].verdict } else { 'MISSING' }
 		$rv = if ($r.Count) { $r[0].verdict } else { 'MISSING' }
-		$final = $tv
-		if ($severity.ContainsKey($rv) -and $severity.ContainsKey($tv) -and $severity[$rv] -lt $severity[$tv]) { $final = $rv }
+		# The verdict measures the TARGET; the reference row is context (what a
+		# real camera looks like on this machine). Flagging, not downgrading,
+		# when the target is softer than the reference keeps tool limitations
+		# on the reference side (e.g. a hardware camera without VERSIONINFO)
+		# from polluting the target's verdict.
+		$worse = ($severity.ContainsKey($rv) -and $severity.ContainsKey($tv) -and $severity[$tv] -lt $severity[$rv])
 		$comparison.Add([pscustomobject]@{
-				vector            = $vectorId
-				target_value      = if ($t.Count) { $t[0].value } else { $null }
-				target_verdict    = $tv
-				reference_value   = if ($r.Count) { $r[0].value } else { $null }
-				reference_verdict = $rv
-				verdict           = $final
+				vector               = $vectorId
+				target_value         = if ($t.Count) { $t[0].value } else { $null }
+				target_verdict       = $tv
+				reference_value      = if ($r.Count) { $r[0].value } else { $null }
+				reference_verdict    = $rv
+				verdict              = $tv
+				worse_than_reference = $worse
 			})
 	}
 	return [pscustomobject]@{

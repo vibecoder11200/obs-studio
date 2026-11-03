@@ -1,0 +1,113 @@
+{
+  "meta": {
+    "timestamp": "2026-11-03T05:15:07.1615016Z",
+    "host": "SAMPLE-PC",
+    "os": "Microsoft Windows NT 10.0.26300.0",
+    "ps_version": "7.6.9",
+    "mode": "scan"
+  },
+  "target": {
+    "moniker": "@device:sw:{860BB310-5D01-11D0-BD3B-00A0C911CE86}\\{76692E1E-F28F-4DD6-9024-C3A999D30EFB}",
+    "clsid": "76692E1E-F28F-4DD6-9024-C3A999D30EFB",
+    "friendly_name": "Logitech HD Pro Webcam C920",
+    "description": null,
+    "devicepath_moniker": "\\\\?\\usb#vid_046d&pid_0825#5022C070#{a5fcb97d-90a7-418f-ae26-1e6e2c55f2d2}",
+    "devicepath_registry": "\\\\?\\usb#vid_046d&pid_0825#5022C070#{a5fcb97d-90a7-418f-ae26-1e6e2c55f2d2}",
+    "inprocserver": "C:\\Users\\user\\vcam-work\\obs-beta\\core\\win-dshow\\data\\lvc920x64.dll",
+    "camera_controls": "probe-error"
+  },
+  "target_baseline": [],
+  "reference": {
+    "moniker": "@device:pnp:\\\\?\\usb#vid_04f2&pid_b76f&mi_00#6&330c68f9&0&0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}\\global",
+    "clsid": "",
+    "friendly_name": "ACER HD User Facing",
+    "description": null,
+    "devicepath_moniker": "\\\\?\\usb#vid_04f2&pid_b76f&mi_00#6&330c68f9&0&0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}\\global",
+    "devicepath_registry": null,
+    "inprocserver": null,
+    "camera_controls": "probe-error"
+  },
+  "vectors": [
+    {
+      "vector": "V1",
+      "target_value": "Logitech HD Pro Webcam C920",
+      "target_verdict": "PASS",
+      "reference_value": "ACER HD User Facing",
+      "reference_verdict": "PASS",
+      "verdict": "PASS",
+      "worse_than_reference": false
+    },
+    {
+      "vector": "V2",
+      "target_value": "76692E1E-F28F-4DD6-9024-C3A999D30EFB",
+      "target_verdict": "PASS",
+      "reference_value": "",
+      "reference_verdict": "PASS",
+      "verdict": "PASS",
+      "worse_than_reference": false
+    },
+    {
+      "vector": "V3",
+      "target_value": "\\\\?\\usb#vid_046d&pid_0825#5022C070#{a5fcb97d-90a7-418f-ae26-1e6e2c55f2d2}",
+      "target_verdict": "PASS",
+      "reference_value": "\\\\?\\usb#vid_04f2&pid_b76f&mi_00#6&330c68f9&0&0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}\\global",
+      "reference_verdict": "PASS",
+      "verdict": "PASS",
+      "worse_than_reference": false
+    },
+    {
+      "vector": "V4",
+      "target_value": "(none)",
+      "target_verdict": "FAIL",
+      "reference_value": "USB\\VID_04F2&PID_B76F&MI_00\\6&330C68F9&0&0000",
+      "reference_verdict": "PASS",
+      "verdict": "FAIL",
+      "worse_than_reference": true
+    },
+    {
+      "vector": "V5",
+      "target_value": "lvc920x64.dll | Company='Logitech' Product='Logitech HD Pro Webcam C920' Desc='Logitech HD Pro Webcam C920'",
+      "target_verdict": "PASS",
+      "reference_value": "(unavailable)",
+      "reference_verdict": "WARN",
+      "verdict": "PASS",
+      "worse_than_reference": false
+    },
+    {
+      "vector": "V6",
+      "target_value": "(absent)",
+      "target_verdict": "FAIL",
+      "reference_value": "##?#USB#VID_04F2&PID_B76F&MI_00#6&330c68f9&0&0000#{e5323777-f976-4f5b-9b55-b94699c46e44} class=Camera",
+      "reference_verdict": "PASS",
+      "verdict": "FAIL",
+      "worse_than_reference": true
+    },
+    {
+      "vector": "V7",
+      "target_value": "probe-error",
+      "target_verdict": "WARN",
+      "reference_value": "probe-error",
+      "reference_verdict": "WARN",
+      "verdict": "WARN",
+      "worse_than_reference": false
+    },
+    {
+      "vector": "V8",
+      "target_value": "OBSVirtualCamVideo=none, OBSVirtualCamVideo4K=none",
+      "target_verdict": "PASS",
+      "reference_value": "OBSVirtualCamVideo=none, OBSVirtualCamVideo4K=none",
+      "reference_verdict": "PASS",
+      "verdict": "PASS",
+      "worse_than_reference": false
+    },
+    {
+      "vector": "V9",
+      "target_value": "%APPDATA%\\obs-virtualcam.txt=absent, %APPDATA%\\obs-studio\\obs-virtualcam.txt=absent",
+      "target_verdict": "PASS",
+      "reference_value": "%APPDATA%\\obs-virtualcam.txt=absent, %APPDATA%\\obs-studio\\obs-virtualcam.txt=absent",
+      "reference_verdict": "PASS",
+      "verdict": "PASS",
+      "worse_than_reference": false
+    }
+  ]
+}

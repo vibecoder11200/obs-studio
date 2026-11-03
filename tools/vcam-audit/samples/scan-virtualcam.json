@@ -1,0 +1,246 @@
+{
+  "meta": {
+    "timestamp": "2026-11-03T05:11:47.3726886Z",
+    "host": "SAMPLE-PC",
+    "os": "Microsoft Windows NT 10.0.26300.0",
+    "ps_version": "7.6.9",
+    "mode": "scan"
+  },
+  "dshow": [
+    {
+      "moniker": "@device:pnp:\\\\?\\usb#vid_04f2&pid_b76f&mi_00#6&330c68f9&0&0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}\\global",
+      "clsid": "",
+      "friendly_name": "ACER HD User Facing",
+      "description": null,
+      "devicepath_moniker": "\\\\?\\usb#vid_04f2&pid_b76f&mi_00#6&330c68f9&0&0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}\\global",
+      "devicepath_registry": null,
+      "inprocserver": null,
+      "camera_controls": "probe-error"
+    },
+    {
+      "moniker": "@device:sw:{860BB310-5D01-11D0-BD3B-00A0C911CE86}\\{76692E1E-F28F-4DD6-9024-C3A999D30EFB}",
+      "clsid": "76692E1E-F28F-4DD6-9024-C3A999D30EFB",
+      "friendly_name": "Logitech HD Pro Webcam C920",
+      "description": null,
+      "devicepath_moniker": "\\\\?\\usb#vid_046d&pid_0825#5022C070#{a5fcb97d-90a7-418f-ae26-1e6e2c55f2d2}",
+      "devicepath_registry": "\\\\?\\usb#vid_046d&pid_0825#5022C070#{a5fcb97d-90a7-418f-ae26-1e6e2c55f2d2}",
+      "inprocserver": "C:\\Users\\user\\vcam-work\\obs-beta\\core\\win-dshow\\data\\lvc920x64.dll",
+      "camera_controls": "probe-error"
+    }
+  ],
+  "cameras": [
+    {
+      "symbolic_link": "##?#USB#VID_04F2&PID_B76F&MI_00#6&330c68f9&0&0000#{e5323777-f976-4f5b-9b55-b94699c46e44}",
+      "friendly_name": null,
+      "pnp_instance_id": "USB\\VID_04F2&PID_B76F&MI_00\\6&330C68F9&0&0000",
+      "interface_class": "{E5323777-F976-4F5B-9B55-B94699C46E44}"
+    },
+    {
+      "symbolic_link": "##?#HDAUDIO#FUNC_01&VEN_10DE&DEV_00A0&SUBSYS_1025159C&REV_1001#5&326d2daa&0&0001#{65e8773d-8f56-11d0-a3b9-00a0c9223196}",
+      "friendly_name": null,
+      "pnp_instance_id": "HDAUDIO\\FUNC_01&VEN_10DE&DEV_00A0&SUBSYS_1025159C&REV_1001\\5&326D2DAA&0&0001",
+      "interface_class": "{65E8773D-8F56-11D0-A3B9-00A0C9223196}"
+    },
+    {
+      "symbolic_link": "##?#INTELAUDIO#CTLR_DEV_51C8&LINKTYPE_02&DEVTYPE_00&VEN_8086&DEV_AE20&SUBSYS_159C1025&REV_10EC#5&2c95bab1&0&0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}",
+      "friendly_name": null,
+      "pnp_instance_id": "INTELAUDIO\\CTLR_DEV_51C8&LINKTYPE_02&DEVTYPE_00&VEN_8086&DEV_AE20&SUBSYS_159C1025&REV_10EC\\5&2C95BAB1&0&0000",
+      "interface_class": "{65E8773D-8F56-11D0-A3B9-00A0C9223196}"
+    },
+    {
+      "symbolic_link": "##?#INTELAUDIO#CTLR_DEV_51C8&LINKTYPE_03&DEVTYPE_00&VEN_8086&DEV_AE30&SUBSYS_159C1025&REV_0001#5&2c95bab1&0&0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}",
+      "friendly_name": null,
+      "pnp_instance_id": "INTELAUDIO\\CTLR_DEV_51C8&LINKTYPE_03&DEVTYPE_00&VEN_8086&DEV_AE30&SUBSYS_159C1025&REV_0001\\5&2C95BAB1&0&0000",
+      "interface_class": "{65E8773D-8F56-11D0-A3B9-00A0C9223196}"
+    },
+    {
+      "symbolic_link": "##?#INTELAUDIO#CTLR_DEV_51C8&LINKTYPE_06&DEVTYPE_06&VEN_8086&DEV_AE50&SUBSYS_159C1025&REV_0001#0603#{65e8773d-8f56-11d0-a3b9-00a0c9223196}",
+      "friendly_name": null,
+      "pnp_instance_id": "INTELAUDIO\\CTLR_DEV_51C8&LINKTYPE_06&DEVTYPE_06&VEN_8086&DEV_AE50&SUBSYS_159C1025&REV_0001\\0603",
+      "interface_class": "{65E8773D-8F56-11D0-A3B9-00A0C9223196}"
+    },
+    {
+      "symbolic_link": "##?#INTELAUDIO#FUNC_01&VEN_10EC&DEV_0287&SUBSYS_1025159C&REV_1000#5&2c95bab1&0&0001#{65e8773d-8f56-11d0-a3b9-00a0c9223196}",
+      "friendly_name": null,
+      "pnp_instance_id": "INTELAUDIO\\FUNC_01&VEN_10EC&DEV_0287&SUBSYS_1025159C&REV_1000\\5&2C95BAB1&0&0001",
+      "interface_class": "{65E8773D-8F56-11D0-A3B9-00A0C9223196}"
+    },
+    {
+      "symbolic_link": "##?#ROOT#UNNAMED_DEVICE#0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}",
+      "friendly_name": null,
+      "pnp_instance_id": "ROOT\\UNNAMED_DEVICE\\0000",
+      "interface_class": "{65E8773D-8F56-11D0-A3B9-00A0C9223196}"
+    },
+    {
+      "symbolic_link": "##?#USB#VID_04F2&PID_B76F&MI_00#6&330c68f9&0&0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}",
+      "friendly_name": null,
+      "pnp_instance_id": "USB\\VID_04F2&PID_B76F&MI_00\\6&330C68F9&0&0000",
+      "interface_class": "{65E8773D-8F56-11D0-A3B9-00A0C9223196}"
+    },
+    {
+      "symbolic_link": "##?#USB#VID_8087&PID_1024&MI_00#6&1b262c0b&1&0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}",
+      "friendly_name": null,
+      "pnp_instance_id": "USB\\VID_8087&PID_1024&MI_00\\6&1B262C0B&1&0000",
+      "interface_class": "{65E8773D-8F56-11D0-A3B9-00A0C9223196}"
+    }
+  ],
+  "pnp": [
+    {
+      "instance_id": "USB\\VID_04F2&PID_B76F&MI_00\\6&330C68F9&0&0000",
+      "class": "Camera",
+      "friendly_name": "ACER HD User Facing",
+      "manufacturer": "Realtek",
+      "status": "OK"
+    }
+  ],
+  "named": [
+    {
+      "name": "OBSVirtualCamVideo",
+      "opened": false
+    },
+    {
+      "name": "OBSVirtualCamVideo4K",
+      "opened": false
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "%APPDATA%\\obs-virtualcam.txt",
+      "exists": false
+    },
+    {
+      "path": "%APPDATA%\\obs-studio\\obs-virtualcam.txt",
+      "exists": false
+    }
+  ],
+  "vectors": [
+    {
+      "vector": "V1",
+      "device": "ACER HD User Facing",
+      "clsid": "",
+      "value": "ACER HD User Facing",
+      "verdict": "PASS",
+      "reason": "no blocklist name pattern matched"
+    },
+    {
+      "vector": "V1",
+      "device": "Logitech HD Pro Webcam C920",
+      "clsid": "76692E1E-F28F-4DD6-9024-C3A999D30EFB",
+      "value": "Logitech HD Pro Webcam C920",
+      "verdict": "PASS",
+      "reason": "no blocklist name pattern matched"
+    },
+    {
+      "vector": "V2",
+      "device": "ACER HD User Facing",
+      "clsid": "",
+      "value": "",
+      "verdict": "PASS",
+      "reason": "CLSID not in blocklist"
+    },
+    {
+      "vector": "V2",
+      "device": "Logitech HD Pro Webcam C920",
+      "clsid": "76692E1E-F28F-4DD6-9024-C3A999D30EFB",
+      "value": "76692E1E-F28F-4DD6-9024-C3A999D30EFB",
+      "verdict": "PASS",
+      "reason": "CLSID not in blocklist"
+    },
+    {
+      "vector": "V3",
+      "device": "ACER HD User Facing",
+      "clsid": "",
+      "value": "\\\\?\\usb#vid_04f2&pid_b76f&mi_00#6&330c68f9&0&0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}\\global",
+      "verdict": "PASS",
+      "reason": "DevicePath (moniker) has genuine-looking usb#vid&pid format (string level; resolvability is V4)"
+    },
+    {
+      "vector": "V3",
+      "device": "Logitech HD Pro Webcam C920",
+      "clsid": "76692E1E-F28F-4DD6-9024-C3A999D30EFB",
+      "value": "\\\\?\\usb#vid_046d&pid_0825#5022C070#{a5fcb97d-90a7-418f-ae26-1e6e2c55f2d2}",
+      "verdict": "PASS",
+      "reason": "DevicePath (moniker) has genuine-looking usb#vid&pid format (string level; resolvability is V4)"
+    },
+    {
+      "vector": "V4",
+      "device": "ACER HD User Facing",
+      "clsid": "",
+      "value": "USB\\VID_04F2&PID_B76F&MI_00\\6&330C68F9&0&0000",
+      "verdict": "PASS",
+      "reason": "PnP devnode present (class Camera, manufacturer Realtek)"
+    },
+    {
+      "vector": "V4",
+      "device": "Logitech HD Pro Webcam C920",
+      "clsid": "76692E1E-F28F-4DD6-9024-C3A999D30EFB",
+      "value": "(none)",
+      "verdict": "FAIL",
+      "reason": "no PnP devnode / no Device Manager entry for this device"
+    },
+    {
+      "vector": "V5",
+      "device": "ACER HD User Facing",
+      "clsid": "",
+      "value": "(unavailable)",
+      "verdict": "WARN",
+      "reason": "no InprocServer32 path - cannot read binary metadata"
+    },
+    {
+      "vector": "V5",
+      "device": "Logitech HD Pro Webcam C920",
+      "clsid": "76692E1E-F28F-4DD6-9024-C3A999D30EFB",
+      "value": "lvc920x64.dll | Company='Logitech' Product='Logitech HD Pro Webcam C920' Desc='Logitech HD Pro Webcam C920'",
+      "verdict": "PASS",
+      "reason": "no blocklist metadata pattern in file name or VERSIONINFO fields"
+    },
+    {
+      "vector": "V6",
+      "device": "ACER HD User Facing",
+      "clsid": "",
+      "value": "##?#USB#VID_04F2&PID_B76F&MI_00#6&330c68f9&0&0000#{e5323777-f976-4f5b-9b55-b94699c46e44} class=Camera",
+      "verdict": "PASS",
+      "reason": "present as a hardware-class camera device interface"
+    },
+    {
+      "vector": "V6",
+      "device": "Logitech HD Pro Webcam C920",
+      "clsid": "76692E1E-F28F-4DD6-9024-C3A999D30EFB",
+      "value": "(absent)",
+      "verdict": "FAIL",
+      "reason": "not exposed as a system camera device interface (MF-only and WebRTC apps cannot enumerate it)"
+    },
+    {
+      "vector": "V7",
+      "device": "ACER HD User Facing",
+      "clsid": "",
+      "value": "probe-error",
+      "verdict": "WARN",
+      "reason": "camera-control probe did not complete (best-effort vector)"
+    },
+    {
+      "vector": "V7",
+      "device": "Logitech HD Pro Webcam C920",
+      "clsid": "76692E1E-F28F-4DD6-9024-C3A999D30EFB",
+      "value": "probe-error",
+      "verdict": "WARN",
+      "reason": "camera-control probe did not complete (best-effort vector)"
+    },
+    {
+      "vector": "V8",
+      "device": "(machine)",
+      "clsid": "",
+      "value": "OBSVirtualCamVideo=none, OBSVirtualCamVideo4K=none",
+      "verdict": "PASS",
+      "reason": "no known virtual-camera named section opened"
+    },
+    {
+      "vector": "V9",
+      "device": "(machine)",
+      "clsid": "",
+      "value": "%APPDATA%\\obs-virtualcam.txt=absent, %APPDATA%\\obs-studio\\obs-virtualcam.txt=absent",
+      "verdict": "PASS",
+      "reason": "no known virtual-camera config artifact found"
+    }
+  ]
+}

@@ -93,8 +93,15 @@ the runner and enumerates it via COM (dynamic V1/V2/V3/V5 checks).
 
 ## Samples
 
-`samples/` holds scan JSON reports captured from real machines:
-`scan-real-webcam.json` (physical camera baseline) and
-`scan-virtualcam.json` (fork virtual camera). Regenerate them when the mod or
-the blocklist changes; keep them free of machine-specific data (the scan only
-collects device metadata).
+`samples/` holds scan JSON reports captured from a real machine (Windows 11
+26300, laptop with a physical "ACER HD User Facing" camera; host name and user
+paths sanitized):
+
+- `scan-real-webcam.json` — baseline captured with only the physical camera
+  installed (reference for `diff`).
+- `scan-virtualcam.json` — the same machine with the fork's virtual camera
+  (`33.0.1-c920.2-beta.1`) installed and registered.
+- `diff-virtualcam-vs-real.json` — the `diff` report joining the two: the
+  virtual camera passes V1/V2/V3/V5/V8/V9 and structurally cannot pass V4/V6
+  (no PnP devnode / system camera interface — user-mode DShow limit; kernel
+  driver or Frame Server territory).
