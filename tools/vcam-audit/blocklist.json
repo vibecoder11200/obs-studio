@@ -34,7 +34,8 @@
   ],
   "named_sections": [
     { "name": "OBSVirtualCamVideo", "product": "OBS Studio virtual camera shared-memory queue (upstream and this fork before the rename)" },
-    { "name": "OBSVirtualCamVideo4K", "product": "OBS Studio virtual camera (pyvirtualcam-compatible variants)" }
+    { "name": "OBSVirtualCamVideo4K", "product": "OBS Studio virtual camera (pyvirtualcam-compatible variants)" },
+    { "name": "C920VideoQueue", "product": "this fork's rebranded virtual camera shared-memory queue (VIRTUALCAM_QUEUE_NAME, proven live on the real machine 2026-11-03)" }
   ],
   "config_artifacts": [
     { "path": "%APPDATA%\\obs-virtualcam.txt", "product": "OBS Studio virtual camera resolution file (filter reader path)" },

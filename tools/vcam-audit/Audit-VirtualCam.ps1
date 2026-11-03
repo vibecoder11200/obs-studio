@@ -970,8 +970,9 @@ switch ($Command) {
 			vectors   = $vectors
 		}
 		if ($Json) {
-			$json = $report | ConvertTo-Json -Depth 8
-			if ($OutFile) { $json | Set-Content -Path $OutFile -Encoding utf8NoBOM } else { $json }
+			# NB: must not be named $json - PowerShell vars are case-insensitive and would clobber the [switch]$Json param
+			$jsonText = $report | ConvertTo-Json -Depth 8
+			if ($OutFile) { $jsonText | Set-Content -Path $OutFile -Encoding utf8NoBOM } else { $jsonText }
 		} else {
 			$report.vectors | Format-Table vector, device, verdict, value -AutoSize | Out-String | Write-Host
 			if ($OutFile) { $report | ConvertTo-Json -Depth 8 | Set-Content -Path $OutFile -Encoding utf8NoBOM }
@@ -983,8 +984,8 @@ switch ($Command) {
 		$inventory = Get-VcamInventory -Blocklist $blocklist
 		$comparison = Invoke-VcamDiff -Inventory $inventory -Blocklist $blocklist -BaselinePath $Baseline -TargetClsid $Clsid -RefClsid $ReferenceClsid
 		if ($Json) {
-			$json = $comparison | ConvertTo-Json -Depth 8
-			if ($OutFile) { $json | Set-Content -Path $OutFile -Encoding utf8NoBOM } else { $json }
+			$jsonText = $comparison | ConvertTo-Json -Depth 8
+			if ($OutFile) { $jsonText | Set-Content -Path $OutFile -Encoding utf8NoBOM } else { $jsonText }
 		} else {
 			Write-Status "Target:    $($comparison.target.friendly_name) (CLSID $($comparison.target.clsid))"
 			Write-Status "Reference: $($comparison.reference.friendly_name) (CLSID $($comparison.reference.clsid))"

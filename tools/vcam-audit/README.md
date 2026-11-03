@@ -105,3 +105,10 @@ paths sanitized):
   virtual camera passes V1/V2/V3/V5/V8/V9 and structurally cannot pass V4/V6
   (no PnP devnode / system camera interface — user-mode DShow limit; kernel
   driver or Frame Server territory).
+- `scan-virtualcam-live.json` — captured **while the virtual camera output was
+  streaming** (OBS `--startvirtualcam`, probe run in the interactive session —
+  session-0 probes cannot see session-local named objects). Shows the rebrand
+  working end to end: `OBSVirtualCamVideo`/`OBSVirtualCamVideo4K` absent while
+  `C920VideoQueue` is OPEN, so V8 only trips once the scanner knows the new
+  queue name (added to `blocklist.json` after this run); V1/V2/V3/V5/V9 stay
+  PASS while live.
