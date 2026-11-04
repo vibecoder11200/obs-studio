@@ -147,3 +147,7 @@ jobs:
               || gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1
           fi
           gh release upload "${tag}" --repo "${GITHUB_REPOSITORY}" --clobber "${staged}"
+
+          # tag pushes auto-create a draft release in this repo; publish
+          # once the artifact is in
+          gh release edit "${tag}" --repo "${GITHUB_REPOSITORY}" --draft=false

@@ -390,3 +390,8 @@ jobs:
           } else {
             gh release upload $tag --repo ${Env:GITHUB_REPOSITORY} --clobber $uploads
           }
+
+          # A tag push auto-creates a DRAFT release in this repo (the view
+          # guard above then finds it and only uploads); publish once the
+          # artifacts are in.
+          gh release edit $tag --repo ${Env:GITHUB_REPOSITORY} --draft=false

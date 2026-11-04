@@ -162,3 +162,7 @@ jobs:
             "${staging}/OBS-Studio-${version}-Linux-x86_64.deb" \
             "${staging}/OBS-Studio-${version}-Linux-portable.tar.gz" \
             "${staging}/vcamuvc-dkms-${version}.deb"
+
+          # tag pushes auto-create a draft release in this repo; publish
+          # once the artifacts are in
+          gh release edit "${tag}" --repo "${GITHUB_REPOSITORY}" --draft=false
