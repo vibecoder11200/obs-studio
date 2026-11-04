@@ -12,16 +12,17 @@ $ProjectRoot = Resolve-Path -Path "$PSScriptRoot/../.."
 $Blocklist = Get-Content "$PSScriptRoot/blocklist.json" -Raw | ConvertFrom-Json
 $DialogSource = Get-Content "$ProjectRoot/frontend/dialogs/OBSBasicVCamConfig.cpp" -Raw
 
-# The preset table in IdentityPresetChanged():
-#   static const char *preset_names[] = { "A", "B", ... };
-$Pattern = 'preset_names\[\]\s*=\s*\{([^}]*)\}'
-$Match = [regex]::Match($DialogSource, $Pattern, [System.Text.RegularExpressions.RegexOptions]::Singleline)
-if (-not $Match.Success) {
-    Write-Error "preset_names table not found in OBSBasicVCamConfig.cpp"
+# The preset names are the plain literals the constructor feeds into the
+# preset combo (the localized "Custom" entry is a QTStr key, not a camera
+# identity, and cannot match the addItem("...") form):
+#   ui->identityPreset->addItem("Logitech HD Pro Webcam C920");
+$Pattern = 'identityPreset->addItem\("([^"]+)"\)'
+$Matches = [regex]::Matches($DialogSource, $Pattern)
+if ($Matches.Count -eq 0) {
+    Write-Error "no identityPreset addItem literals found in OBSBasicVCamConfig.cpp"
     exit 2
 }
-
-$Presets = [regex]::Matches($Match.Groups[1].Value, '"([^"]*)"') | ForEach-Object { $_.Groups[1].Value }
+$Presets = $Matches | ForEach-Object { $_.Groups[1].Value }
 if (-not $Presets -or @($Presets).Count -eq 0) {
     Write-Error "preset_names table is empty"
     exit 2

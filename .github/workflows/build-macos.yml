@@ -22,14 +22,12 @@ concurrency:
 jobs:
   macos-build:
     name: macOS Build 🍎 (${{ matrix.target }})
-    runs-on: ${{ matrix.target == 'arm64' && 'macos-15' || 'macos-13' }}
+    # Upstream builds both targets on macos-26 (the build scripts require
+    # macOS >= 26; older images fail check_macos or are retired).
+    runs-on: macos-26
     strategy:
       fail-fast: false
       matrix:
-        # Intel image name is [UNVERIFIED] until the first dispatch run
-        # confirms what GitHub currently offers (macos-13 is the last free
-        # intel image); fallback if it is retired: ship the arm64 dmg only
-        # and build intel locally with .github/scripts/build-macos.
         target: [arm64, x86_64]
     defaults:
       run:

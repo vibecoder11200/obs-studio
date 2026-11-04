@@ -61,9 +61,11 @@ jobs:
           ./packaging/linux/dkms/build-dkms-deb.sh "${BUILD_DIR}" "${version}"
 
           dpkg-deb -I "${BUILD_DIR}"/vcamuvc-dkms_*.deb | head -n 12
-          dpkg-deb -c "${BUILD_DIR}"/vcamuvc-dkms_*.deb | grep -q "usr/src/vcamuvc-[^/]*/v4l2loopback.c" \
+          # dpkg-deb -c writes through a pipe; plain grep (no -q) must drain
+          # it or tar dies on SIGPIPE and pipefail fails the step.
+          dpkg-deb -c "${BUILD_DIR}"/vcamuvc-dkms_*.deb | grep "usr/src/vcamuvc-[^/]*/v4l2loopback.c" >/dev/null \
             || { echo "::error::DKMS deb is missing the module source"; exit 1; }
-          dpkg-deb -c "${BUILD_DIR}"/vcamuvc-dkms_*.deb | grep -q "usr/src/vcamuvc-[^/]*/dkms.conf" \
+          dpkg-deb -c "${BUILD_DIR}"/vcamuvc-dkms_*.deb | grep "usr/src/vcamuvc-[^/]*/dkms.conf" >/dev/null \
             || { echo "::error::DKMS deb is missing dkms.conf"; exit 1; }
           echo "DKMS deb verified."
 
@@ -108,7 +110,7 @@ jobs:
             echo "::error::No OBS deb found after packaging."
             exit 1
           fi
-          if dpkg-deb -c "${deb}" | grep -q "linux-v4l2"; then
+          if dpkg-deb -c "${deb}" | grep "linux-v4l2" >/dev/null; then
             echo "OBS deb contains the linux-v4l2 plugin."
           else
             echo "::error::OBS deb does not contain the linux-v4l2 plugin."
