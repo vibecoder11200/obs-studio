@@ -8,7 +8,7 @@ on:
     branches:
       - master
     tags:
-      - 'v*'
+      - '[0-9]*'
   pull_request:
     paths-ignore:
       - '**.md'

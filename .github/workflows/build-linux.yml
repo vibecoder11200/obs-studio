@@ -9,7 +9,7 @@ run-name: Build Linux 🐧 ${{ github.ref_name }}
 on:
   push:
     tags:
-      - 'v*'
+      - '[0-9]*'
   workflow_dispatch:
 
 permissions:
