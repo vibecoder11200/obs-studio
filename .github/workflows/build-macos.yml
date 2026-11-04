@@ -33,13 +33,6 @@ jobs:
       run:
         shell: zsh --no-rcs --errexit --pipefail {0}
 
-    env:
-      BUILD_DIR: build_macos
-      # The macos-ci preset enables Xcode compilation caching and reads the
-      # CAS path from this variable; unset, CAS init fails with "RootID
-      # does not exist". Upstream points it at DerivedData the same way.
-      XCODE_CAS_PATH: ${{ runner.temp }}/xcode-compilation-cache
-
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -47,6 +40,12 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Xcode compilation cache 🗃️
+        # The macos-ci preset enables Xcode compilation caching and reads
+        # the CAS path from this variable; unset, CAS init fails with
+        # "RootID does not exist". Upstream points it at DerivedData the
+        # same way.
+        env:
+          XCODE_CAS_PATH: ${{ runner.temp }}/xcode-compilation-cache
         run: mkdir -p "${XCODE_CAS_PATH}"
 
       - name: Build OBS Studio 🧱
@@ -54,6 +53,8 @@ jobs:
         with:
           target: ${{ matrix.target }}
           config: ${{ startsWith(github.ref, 'refs/tags/') && 'Release' || 'RelWithDebInfo' }}
+        env:
+          XCODE_CAS_PATH: ${{ runner.temp }}/xcode-compilation-cache
 
       - name: Package OBS Studio 📀
         uses: ./.github/actions/package-obs
