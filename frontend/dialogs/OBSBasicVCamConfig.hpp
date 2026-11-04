@@ -21,6 +21,11 @@ public:
 private slots:
 	void OutputTypeChanged();
 	void UpdateConfig();
+#ifdef _WIN32
+	void IdentityPresetChanged();
+	void IdentityApply();
+	void IdentityReset();
+#endif
 
 private:
 	std::unique_ptr<Ui::OBSBasicVCamConfig> ui;

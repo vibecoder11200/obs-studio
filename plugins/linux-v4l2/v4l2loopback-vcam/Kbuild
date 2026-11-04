@@ -1,0 +1,4 @@
+# vcamuvc: forked v4l2loopback building as the neutral-named module.
+# The upstream source file name (v4l2loopback.c) is kept for provenance.
+obj-m += vcamuvc.o
+vcamuvc-objs := v4l2loopback.o

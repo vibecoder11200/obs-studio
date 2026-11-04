@@ -78,14 +78,14 @@ class OBSCameraDeviceSource: NSObject, CMIOExtensionDeviceSource {
         _bufferAuxAttributes = [kCVPixelBufferPoolAllocationThresholdKey: 5]
 
         _streamSource = OBSCameraStreamSource(
-            localizedName: "OBS Camera Extension Stream Source",
+            localizedName: VcamBrand.streamSourceName,
             streamID: sourceUUID,
             streamFormat: videoStreamFormat,
             device: device
         )
 
         _streamSink = OBSCameraStreamSink(
-            localizedName: "OBS Camera Extension Stream Sink",
+            localizedName: VcamBrand.streamSinkName,
             streamID: sinkUUID,
             streamFormat: videoStreamFormat,
             device: device
@@ -122,7 +122,7 @@ class OBSCameraDeviceSource: NSObject, CMIOExtensionDeviceSource {
             deviceProperties.transportType = kIOAudioDeviceTransportTypeVirtual
         }
         if properties.contains(.deviceModel) {
-            deviceProperties.model = "OBS Camera Extension"
+            deviceProperties.model = VcamBrand.model
         }
 
         return deviceProperties

@@ -8,7 +8,7 @@ on:
     branches:
       - master
     tags:
-      - '*'
+      - 'v*'
   pull_request:
     paths-ignore:
       - '**.md'
@@ -62,6 +62,13 @@ jobs:
             throw "No package zip found for audit."
           }
 
+          # Preset coherence: the identity presets in the settings dialog
+          # must never match our own blocklist patterns (phase 1, task 4).
+          ./tools/vcam-audit/check-preset-coherence.ps1
+          if ( $LASTEXITCODE -ne 0 ) {
+            throw "Preset coherence check failed with $($LASTEXITCODE)."
+          }
+
           # Canonical static gate (tools/vcam-audit/README.md) - locates the
           # virtualcam DLL by CLSID resource and scans metadata/names/strings.
           ./tools/vcam-audit/Audit-VirtualCam.ps1 static -Package $zip.FullName
@@ -69,7 +76,9 @@ jobs:
             throw "Antidetect static gate failed with $($LASTEXITCODE) violation(s)."
           }
 
-          # The fork ships no debug symbols - no PDB may remain in the package.
+          # The fork ships no debug symbols - no PDB may remain in the package,
+          # and the release payload (audit harness, portable marker, identity
+          # helper) must be present.
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $archive = [System.IO.Compression.ZipFile]::OpenRead($zip.FullName)
           try {
@@ -77,10 +86,16 @@ jobs:
             if ( $pdbs.Count -gt 0 ) {
               throw "Package contains $($pdbs.Count) PDB file(s), e.g. $($pdbs[0].FullName)"
             }
+            foreach ( $required in 'auxdata/vcam-audit/Audit-VirtualCam.ps1', 'portable_mode', 'core/win-dshow/data/vcamctl.exe' ) {
+              $entry = $archive.Entries | Where-Object { $_.FullName -ieq $required }
+              if ( -not $entry ) {
+                throw "Required release payload missing from package: $required"
+              }
+            }
           } finally {
             $archive.Dispose()
           }
-          Write-Host "Antidetect audit passed: static gate clean, no PDBs in package."
+          Write-Host "Antidetect audit passed: static gate clean, no PDBs, release payload complete."
 
       - name: VirtualCam Smoke Test 🧪
         if: github.event_name != 'pull_request'
@@ -225,10 +240,9 @@ jobs:
 
             # Registry-level asserts: Instance key DevicePath (phase 3) and
             # exactly one registration per registry view (no ambiguity).
-            foreach ( $inprocPath in "Registry::HKEY_CLASSES_ROOT\CLSID\{$Clsid}\InprocServer32" ) {
-              if ( -not (Test-Path $inprocPath) ) {
-                throw "Virtualcam CLSID not registered (expected in $inprocPath)."
-              }
+            $inprocPath = "Registry::HKEY_CLASSES_ROOT\CLSID\{$Clsid}\InprocServer32"
+            if ( -not (Test-Path $inprocPath) ) {
+              throw "Virtualcam CLSID not registered (expected in $inprocPath)."
             }
             $instanceKey = "Registry::HKEY_CLASSES_ROOT\CLSID\{860BB310-5D01-11D0-BD3B-00A0C911CE86}\Instance\{$Clsid}"
             $devicePath = (Get-ItemProperty -Path $instanceKey -ErrorAction SilentlyContinue).DevicePath
@@ -267,34 +281,112 @@ jobs:
             Remove-Item -Recurse -Force $testDir -ErrorAction SilentlyContinue
           }
 
+      - name: Inno Setup Installer 📦
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $zip = Get-ChildItem -Path "build_${{ matrix.architecture }}" -Filter "obs-studio-*-windows-${{ matrix.architecture }}.zip" -File | Select-Object -First 1
+          if ( -not $zip ) {
+            throw "No package zip found for the installer."
+          }
+
+          choco install innosetup -y --no-progress
+          $Iscc = Join-Path (${env:ProgramFiles(x86)}) 'Inno Setup 6\ISCC.exe'
+          if ( -not (Test-Path $Iscc) ) {
+            throw "ISCC.exe not found at $Iscc after innosetup install."
+          }
+
+          # The installer compiles against the unpacked package tree.
+          $installSource = Join-Path $env:RUNNER_TEMP 'installer-source'
+          Remove-Item -Recurse -Force $installSource -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $installSource -Force | Out-Null
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [System.IO.Compression.ZipFile]::ExtractToDirectory($zip.FullName, $installSource)
+
+          $GitDescription = (git describe --tags --long)
+          $Tokens = ($GitDescription -split '-')
+          $Version = $Tokens[0..$($Tokens.Count - 3)] -join '-'
+
+          & $Iscc "/DSourceDir=$installSource" "/DAppVersion=$Version" packaging/windows/installer.iss
+          if ( $LASTEXITCODE -ne 0 ) {
+            throw "ISCC failed with exit code $LASTEXITCODE"
+          }
+
+          $installer = Get-ChildItem -Path $installSource -Filter 'OBS-Studio-*-Windows-x64-Installer.exe' -File | Select-Object -First 1
+          if ( -not $installer ) {
+            throw "Installer output not found after ISCC."
+          }
+          Move-Item $installer.FullName "build_${{ matrix.architecture }}\"
+          Write-Host "Installer built: build_${{ matrix.architecture }}\$($installer.Name)"
+
       - name: Upload Build Artifacts 📡
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: obs-studio-windows-${{ matrix.architecture }}-${{ github.sha }}
-          path: ${{ github.workspace }}/build_${{ matrix.architecture }}/obs-studio-*-windows-${{ matrix.architecture }}.zip
+          path: |
+            ${{ github.workspace }}/build_${{ matrix.architecture }}/obs-studio-*-windows-${{ matrix.architecture }}.zip
+            ${{ github.workspace }}/build_${{ matrix.architecture }}/OBS-Studio-*-Windows-x64-Installer.exe
+          retention-days: 30
 
       - name: Create GitHub Release 🛫
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Create GitHub Release (tag builds only)
+          # Upload release artifacts (tag builds only). Release creation is
+          # guarded but not atomic: all three OS workflows race on the first
+          # tag build (red-team F3), so a failed create falls back to view +
+          # upload instead of dropping this platform's artifacts.
           $ErrorActionPreference = 'Stop'
           $tag = '${{ github.ref_name }}'
 
-          $files = Get-ChildItem -Path "build_${{ matrix.architecture }}" -Filter "obs-studio-*-windows-${{ matrix.architecture }}.zip" -File
-          if ( $files.Count -eq 0 ) {
+          $zip = Get-ChildItem -Path "build_${{ matrix.architecture }}" -Filter "obs-studio-*-windows-${{ matrix.architecture }}.zip" -File | Select-Object -First 1
+          if ( -not $zip ) {
             throw "No package zip found for release upload."
           }
-          $zipPath = $files[0].FullName
+
+          # Release-facing names (OBS-Studio-<ver>-Windows-x64[.zip|-Installer.exe])
+          $GitDescription = (git describe --tags --long)
+          $Tokens = ($GitDescription -split '-')
+          $Version = $Tokens[0..$($Tokens.Count - 3)] -join '-'
+          $staging = Join-Path $env:RUNNER_TEMP 'release-upload'
+          New-Item -ItemType Directory -Path $staging -Force | Out-Null
+          $releaseZip = Join-Path $staging "OBS-Studio-${Version}-Windows-x64.zip"
+          Copy-Item $zip.FullName $releaseZip
+          $uploads = @($releaseZip)
+
+          $installer = Get-ChildItem -Path "build_${{ matrix.architecture }}" -Filter 'OBS-Studio-*-Windows-x64-Installer.exe' -File | Select-Object -First 1
+          if ( $installer ) {
+            $uploads += $installer.FullName
+          } else {
+            Write-Host "WARNING: no installer artifact found; uploading the zip only."
+          }
 
           gh release view $tag --repo ${Env:GITHUB_REPOSITORY} *> $null
           if ( $LASTEXITCODE -ne 0 ) {
+            $notes = @(
+              "OBS Studio **$tag** — fork with the Virtual Camera registered as **Logitech HD Pro Webcam C920** (GUID 76692E1E-F28F-4DD6-9024-C3A999D30EFB).",
+              "",
+              "**Windows**: portable ZIP (includes the portable_mode marker and the self-audit harness under auxdata/vcam-audit/) and an Inno Setup installer. Identity changes without a rebuild: core\win-dshow\data\vcamctl.exe (get/set/reset) or the Virtual Camera configuration dialog in OBS (requires admin approval).",
+              "",
+              "**macOS** (unsigned/ad-hoc): activate with systemextensionsctl developer on for the camera extension; the DAL plugin reads as HD Pro Webcam C920.",
+              "",
+              "**Linux**: .deb, portable tar.gz, and the vcamuvc DKMS module (reports driver name uvcvideo). Audit scripts for all three OS ship in the Windows zip (auxdata/vcam-audit/) and under tools/ per OS."
+            ) -join "`n"
             gh release create $tag `
               --repo ${Env:GITHUB_REPOSITORY} `
               --title "OBS Studio ${tag}" `
-              --notes "OBS Studio **${tag}** — fork with the Virtual Camera registered as **Logitech HD Pro Webcam C920** (GUID 76692E1E-F28F-4DD6-9024-C3A999D30EFB). Based on upstream obsproject/obs-studio. Windows x64 portable build — unzip and run, then use Start Virtual Camera." `
-              $zipPath
+              --notes $notes `
+              $uploads
+            if ( $LASTEXITCODE -ne 0 ) {
+              # Another OS workflow created the release between the view and
+              # the create; upload into it as long as it now exists.
+              gh release view $tag --repo ${Env:GITHUB_REPOSITORY} *> $null
+              if ( $LASTEXITCODE -ne 0 ) {
+                throw "Release creation failed for $tag."
+              }
+              gh release upload $tag --repo ${Env:GITHUB_REPOSITORY} --clobber $uploads
+            }
           } else {
-            gh release upload $tag --repo ${Env:GITHUB_REPOSITORY} --clobber $zipPath
+            gh release upload $tag --repo ${Env:GITHUB_REPOSITORY} --clobber $uploads
           }

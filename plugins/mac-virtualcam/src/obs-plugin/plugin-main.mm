@@ -4,6 +4,7 @@
 #include <obs-module.h>
 #include "OBSDALMachServer.h"
 #include "Defines.h"
+#include "vcam-brand-macos.h"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("mac-virtualcam", "en-US")
@@ -125,7 +126,7 @@ struct virtualcam_data {
 static void install_cmio_system_extension(struct virtualcam_data *vcam)
 {
     OSSystemExtensionRequest *request = [OSSystemExtensionRequest
-        activationRequestForExtension:@"com.obsproject.obs-studio.mac-camera-extension"
+        activationRequestForExtension:@VIRTUALCAM_EXTENSION_BUNDLE_ID
                                 queue:dispatch_get_main_queue()];
     request.delegate = vcam->extensionDelegate;
 
@@ -142,7 +143,7 @@ static dal_plugin_status check_dal_plugin()
 {
     NSFileManager *fileManager = [NSFileManager defaultManager];
 
-    NSString *dalPluginFileName = [OBSDalDestination stringByAppendingString:@"/obs-mac-virtualcam.plugin"];
+    NSString *dalPluginFileName = [OBSDalDestination stringByAppendingString:@"/" VIRTUALCAM_MAC_PLUGIN_FILE ".plugin"];
 
     BOOL dalPluginInstalled = [fileManager fileExistsAtPath:dalPluginFileName];
 
@@ -150,7 +151,8 @@ static dal_plugin_status check_dal_plugin()
         NSDictionary *dalPluginInfoPlist = [NSDictionary
             dictionaryWithContentsOfURL:
                 [NSURL fileURLWithPath:[OBSDalDestination
-                                           stringByAppendingString:@"/obs-mac-virtualcam.plugin/Contents/Info.plist"]]];
+                                           stringByAppendingString:@"/" VIRTUALCAM_MAC_PLUGIN_FILE
+                                           ".plugin/Contents/Info.plist"]]];
 
         NSString *dalPluginVersion = [dalPluginInfoPlist valueForKey:@"CFBundleShortVersionString"];
         NSString *dalPluginBuild = [dalPluginInfoPlist valueForKey:@"CFBundleVersion"];
@@ -172,7 +174,7 @@ static bool install_dal_plugin(bool update)
     BOOL dalPluginDirExists = [fileManager fileExistsAtPath:OBSDalDestination];
 
     NSURL *bundleURL = [[NSBundle mainBundle] bundleURL];
-    NSString *pluginPath = @"Contents/Resources/obs-mac-virtualcam.plugin";
+    NSString *pluginPath = @"Contents/Resources/" VIRTUALCAM_MAC_PLUGIN_FILE ".plugin";
 
     NSURL *pluginUrl = [bundleURL URLByAppendingPathComponent:pluginPath];
     NSString *dalPluginSourcePath = [pluginUrl path];
@@ -208,7 +210,8 @@ static bool uninstall_dal_plugin()
     NSAppleScript *scriptObject = [[NSAppleScript alloc]
         initWithSource:[NSString
                            stringWithFormat:
-                               @"do shell script \"rm -rf %@/obs-mac-virtualcam.plugin\" with administrator privileges",
+                               @"do shell script \"rm -rf %@/" VIRTUALCAM_MAC_PLUGIN_FILE
+                               ".plugin\" with administrator privileges",
                                OBSDalDestination]];
 
     NSDictionary *errorDict;
@@ -382,7 +385,7 @@ static bool virtualcam_output_start(void *data)
         CMIOObjectGetPropertyData(kCMIOObjectSystemObject, &address, 0, NULL, size, &used, device_data);
 
         vcam->deviceID = 0;
-        NSString *OBSVirtualCamUUIDString = [[NSBundle bundleWithIdentifier:@"com.obsproject.mac-virtualcam"]
+        NSString *OBSVirtualCamUUIDString = [[NSBundle bundleWithIdentifier:@VIRTUALCAM_DAL_BUNDLE_ID]
             objectForInfoDictionaryKey:@"OBSCameraDeviceUUID"];
         CFUUIDRef OBSVirtualCamUUID =
             CFUUIDCreateFromString(kCFAllocatorDefault, (CFStringRef) OBSVirtualCamUUIDString);

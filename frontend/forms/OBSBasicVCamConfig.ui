@@ -48,6 +48,113 @@
     </widget>
    </item>
    <item>
+    <widget class="QGroupBox" name="identityGroup">
+     <property name="title">
+      <string>Basic.VCam.Identity.Title</string>
+     </property>
+     <layout class="QGridLayout" name="identityLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="identityPresetLabel">
+        <property name="text">
+         <string>Basic.VCam.Identity.Preset</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QComboBox" name="identityPreset"/>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="identityNameLabel">
+        <property name="text">
+         <string>Basic.VCam.Identity.Name</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QLineEdit" name="identityName">
+        <property name="maxLength">
+         <number>127</number>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="identityVidLabel">
+        <property name="text">
+         <string>Basic.VCam.Identity.Vid</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <layout class="QHBoxLayout" name="identityVidPidLayout">
+        <item>
+         <widget class="QLineEdit" name="identityVid">
+          <property name="maxLength">
+           <number>4</number>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="identityPidLabel">
+          <property name="text">
+           <string>Basic.VCam.Identity.Pid</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="identityPid">
+          <property name="maxLength">
+           <number>4</number>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="identitySerialLabel">
+        <property name="text">
+         <string>Basic.VCam.Identity.Serial</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="QLineEdit" name="identitySerial">
+        <property name="maxLength">
+         <number>15</number>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="0" colspan="2">
+       <layout class="QHBoxLayout" name="identityButtonsLayout">
+        <item>
+         <widget class="QPushButton" name="identityApply">
+          <property name="text">
+           <string>Basic.VCam.Identity.Apply</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="identityReset">
+          <property name="text">
+           <string>Basic.VCam.Identity.Reset</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item row="5" column="0" colspan="2">
+       <widget class="QLabel" name="identityHint">
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+        <property name="text">
+         <string>Basic.VCam.Identity.Hint</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
     <spacer name="verticalSpacer">
      <property name="orientation">
       <enum>Qt::Orientation::Vertical</enum>

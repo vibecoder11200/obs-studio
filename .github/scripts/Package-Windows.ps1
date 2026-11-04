@@ -83,6 +83,29 @@ function Package {
             $PdbEntry.Delete()
         }
         Log-Information "Removed $($PdbEntries.Count) PDB files from $($PackageZip.Name)"
+
+        # Ship the self-audit harness with every release so users can verify
+        # the camera identity without leaving the package (script, blocklist,
+        # vector definitions, README - no samples).
+        Log-Group "Copying virtual camera audit tooling into package..."
+        $AuditSource = Join-Path $ProjectRoot 'tools/vcam-audit'
+        $AuditFiles = Get-ChildItem -Path $AuditSource -Recurse -File |
+            Where-Object { $_.FullName -notmatch '[\\/]samples[\\/]' }
+        foreach ( $AuditFile in $AuditFiles ) {
+            $RelativePath = $AuditFile.FullName.Substring($AuditSource.Length + 1) -replace '[\\/]', '/'
+            $EntryName = "auxdata/vcam-audit/${RelativePath}"
+            [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($ZipArchive, $AuditFile.FullName, $EntryName) | Out-Null
+        }
+        Log-Information "Added $($AuditFiles.Count) audit files to auxdata/vcam-audit/"
+
+        # Portable-mode marker at the package root: OBS looks for it at
+        # BASE_PATH "../.." from bin/64bit, i.e. the folder that contains
+        # bin/ — not next to the binaries.
+        Log-Group "Adding portable_mode marker..."
+        $MarkerEntry = $ZipArchive.CreateEntry("portable_mode")
+        $MarkerStream = $MarkerEntry.Open()
+        $MarkerStream.Dispose()
+        Log-Information "Added portable_mode (package root)"
     } finally {
         $ZipArchive.Dispose()
     }

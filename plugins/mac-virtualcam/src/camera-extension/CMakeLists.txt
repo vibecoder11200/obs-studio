@@ -25,6 +25,7 @@ target_sources(
   mac-camera-extension
   PRIVATE
     "${_placeholder_location}"
+    "${VIRTUALCAM_SWIFT_BRAND_FILE}"
     main.swift
     OBSCameraDeviceSource.swift
     OBSCameraProviderSource.swift
@@ -38,7 +39,7 @@ source_group("Resources" FILES "${_placeholder_location}")
 set_target_properties_obs(
   mac-camera-extension
   PROPERTIES FOLDER plugins
-             OUTPUT_NAME com.obsproject.obs-studio.mac-camera-extension
+             OUTPUT_NAME ${VIRTUALCAM_EXTENSION_BUNDLE_ID}
              RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/../../"
              MACOSX_BUNDLE ON
              MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/Info.plist.in"
@@ -46,19 +47,18 @@ set_target_properties_obs(
              XCODE_PRODUCT_TYPE com.apple.product-type.system-extension
 )
 
-string(TIMESTAMP CURRENT_YEAR "%Y")
 set_target_xcode_properties(
   mac-camera-extension
   PROPERTIES SWIFT_VERSION 5.0
              MACOSX_DEPLOYMENT_TARGET 13.0
              CODE_SIGN_ENTITLEMENTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/entitlements.plist"
-             PRODUCT_NAME com.obsproject.obs-studio.mac-camera-extension
-             PRODUCT_BUNDLE_IDENTIFIER com.obsproject.obs-studio.mac-camera-extension
+             PRODUCT_NAME ${VIRTUALCAM_EXTENSION_BUNDLE_ID}
+             PRODUCT_BUNDLE_IDENTIFIER ${VIRTUALCAM_EXTENSION_BUNDLE_ID}
              CURRENT_PROJECT_VERSION ${OBS_BUILD_NUMBER}
              MARKETING_VERSION ${OBS_VERSION_CANONICAL}
              COPY_PHASE_STRIP NO
              GENERATE_INFOPLIST_FILE YES
-             INFOPLIST_KEY_CFBundleDisplayName "OBS Virtual Camera"
-             INFOPLIST_KEY_NSHumanReadableCopyright "(c) 2022-${CURRENT_YEAR} Sebastian Beckmann, Patrick Heyer"
-             INFOPLIST_KEY_NSSystemExtensionUsageDescription "This Camera Extension enables virtual camera functionality in OBS Studio."
+             INFOPLIST_KEY_CFBundleDisplayName "${VIRTUALCAM_MAC_DEVICE_NAME}"
+             INFOPLIST_KEY_NSHumanReadableCopyright "${VIRTUALCAM_MAC_COPYRIGHT}"
+             INFOPLIST_KEY_NSSystemExtensionUsageDescription "${VIRTUALCAM_EXTENSION_USAGE_DESCRIPTION}"
 )

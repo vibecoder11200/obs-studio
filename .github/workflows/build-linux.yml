@@ -1,0 +1,162 @@
+name: Build Linux
+run-name: Build Linux 🐧 ${{ github.ref_name }}
+
+# Release pipeline (red-team F3: upload-only — the Windows workflow owns
+# release creation; this workflow uploads into it. Creation is guarded but
+# not atomic across the three OS workflows, so a create race falls back to
+# view + upload).
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.ref }}'
+  cancel-in-progress: true
+
+jobs:
+  linux-build:
+    name: Linux Build 🐧
+    # The ubuntu-26.04 runner image availability is [UNVERIFIED] until the
+    # first dispatch run; fallback if GitHub retires it: switch runs-on to
+    # ubuntu-24.04 (the build itself targets ubuntu-x86_64 either way).
+    runs-on: ubuntu-26.04
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      BUILD_DIR: build_ubuntu
+      CONFIG: RelWithDebInfo
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Build OBS Studio 🧱
+        uses: ./.github/actions/build-obs
+        with:
+          target: x86_64
+          config: ${{ startsWith(github.ref, 'refs/tags/') && 'Release' || env.CONFIG }}
+
+      - name: Package OBS Studio 📀
+        uses: ./.github/actions/package-obs
+        with:
+          target: x86_64
+          config: ${{ startsWith(github.ref, 'refs/tags/') && 'Release' || env.CONFIG }}
+          package: true
+
+      - name: Build DKMS Module Deb 🧩
+        run: |
+          # dpkg rejects versions that do not start with a digit, and the
+          # workflow only builds on v* tags — strip the leading v.
+          version="$(git describe --tags --long | sed -E 's/-[0-9]+-g[0-9a-f]+$//' | sed -E 's/^v([0-9])/\1/')"
+          ./packaging/linux/dkms/build-dkms-deb.sh "${BUILD_DIR}" "${version}"
+
+          dpkg-deb -I "${BUILD_DIR}"/vcamuvc-dkms_*.deb | head -n 12
+          dpkg-deb -c "${BUILD_DIR}"/vcamuvc-dkms_*.deb | grep -q "usr/src/vcamuvc-[^/]*/v4l2loopback.c" \
+            || { echo "::error::DKMS deb is missing the module source"; exit 1; }
+          dpkg-deb -c "${BUILD_DIR}"/vcamuvc-dkms_*.deb | grep -q "usr/src/vcamuvc-[^/]*/dkms.conf" \
+            || { echo "::error::DKMS deb is missing dkms.conf"; exit 1; }
+          echo "DKMS deb verified."
+
+      - name: Assemble Portable Archive 🎒
+        run: |
+          set -euo pipefail
+
+          version="$(git describe --tags --long | sed -E 's/-[0-9]+-g[0-9a-f]+$//')"
+          staging="${BUILD_DIR}/portable/OBS-Studio-${version}-Linux-portable"
+          rm -rf "${BUILD_DIR}/portable"
+          mkdir -p "${staging}"
+
+          cfg='${{ startsWith(github.ref, 'refs/tags/') && 'Release' || env.CONFIG }}'
+          cp -a "${BUILD_DIR}/install/${cfg}/bin" \
+                "${BUILD_DIR}/install/${cfg}/lib" \
+                "${BUILD_DIR}/install/${cfg}/share" "${staging}/"
+
+          # OBS portable mode: empty marker next to the binary keeps user
+          # data inside the archive's tree.
+          touch "${staging}/bin/portable_mode"
+
+          cat > "${staging}/run-portable.sh" <<'EOF'
+          #!/bin/sh
+          # Runs OBS in portable mode from this archive (user data stays in ./config).
+          DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+          export LD_LIBRARY_PATH="${DIR}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+          exec "${DIR}/bin/obs" --portable "$@"
+          EOF
+          chmod +x "${staging}/run-portable.sh"
+
+          tar -C "${staging}/.." -czf "${BUILD_DIR}/OBS-Studio-${version}-Linux-portable.tar.gz" "$(basename "${staging}")"
+          echo "portable archive: ${BUILD_DIR}/OBS-Studio-${version}-Linux-portable.tar.gz"
+
+      - name: Package Asserts 🔍
+        run: |
+          set -euo pipefail
+
+          # The OBS deb must contain the rebranded plugin with the fork's
+          # card-label default, and not register the stock identity string.
+          deb=$(ls "${BUILD_DIR}"/obs-studio-*-x86_64-ubuntu-gnu.deb 2>/dev/null | head -n 1)
+          if [ -z "${deb}" ]; then
+            echo "::error::No OBS deb found after packaging."
+            exit 1
+          fi
+          if dpkg-deb -c "${deb}" | grep -q "linux-v4l2"; then
+            echo "OBS deb contains the linux-v4l2 plugin."
+          else
+            echo "::error::OBS deb does not contain the linux-v4l2 plugin."
+            exit 1
+          fi
+
+          # Linux audit script sanity (syntax + JSON emission on the runner).
+          bash -n tools/vcam-audit-linux/audit-virtualcam.sh
+          python3 -c "import json; json.load(open('tools/vcam-audit-linux/blocklist.json'))"
+          echo "Package asserts passed."
+
+      - name: Upload Build Artifacts 📡
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: obs-studio-linux-${{ github.sha }}
+          path: |
+            ${{ github.workspace }}/${{ env.BUILD_DIR }}/obs-studio-*-x86_64-ubuntu-gnu.deb
+            ${{ github.workspace }}/${{ env.BUILD_DIR }}/OBS-Studio-*-Linux-portable.tar.gz
+            ${{ github.workspace }}/${{ env.BUILD_DIR }}/vcamuvc-dkms_*.deb
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload to GitHub Release 🛫
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          tag="${GITHUB_REF_NAME}"
+          version="$(git describe --tags --long | sed -E 's/-[0-9]+-g[0-9a-f]+$//')"
+
+          staging="$(mktemp -d)"
+          deb=$(ls "${BUILD_DIR}"/obs-studio-*-x86_64-ubuntu-gnu.deb | head -n 1)
+          cp "${deb}" "${staging}/OBS-Studio-${version}-Linux-x86_64.deb"
+          cp "${BUILD_DIR}/OBS-Studio-${version}-Linux-portable.tar.gz" "${staging}/"
+          cp "${BUILD_DIR}"/vcamuvc-dkms_*.deb "${staging}/vcamuvc-dkms-${version}.deb"
+
+          if ! gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            # On a creation race with the other OS workflows, fall back to
+            # view (the release then exists) instead of failing the upload.
+            gh release create "${tag}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "OBS Studio ${tag}" \
+              --notes "OBS Studio ${tag} — fork release. Linux: install the .deb and the vcamuvc DKMS module deb (reports driver name 'uvcvideo'); or unpack the portable archive and run ./run-portable.sh." \
+              || gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1
+          fi
+          gh release upload "${tag}" --repo "${GITHUB_REPOSITORY}" --clobber \
+            "${staging}/OBS-Studio-${version}-Linux-x86_64.deb" \
+            "${staging}/OBS-Studio-${version}-Linux-portable.tar.gz" \
+            "${staging}/vcamuvc-dkms-${version}.deb"

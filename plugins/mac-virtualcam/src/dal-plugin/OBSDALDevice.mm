@@ -23,6 +23,7 @@
 
 #import "OBSDALPlugIn.h"
 #import "Logging.h"
+#import "vcam-brand-macos.h"
 
 @interface OBSDALDevice ()
 @property BOOL excludeNonDALAccess;
@@ -100,19 +101,19 @@
 {
     switch (address.mSelector) {
         case kCMIOObjectPropertyName:
-            *static_cast<CFStringRef *>(data) = CFSTR("OBS Virtual Camera");
+            *static_cast<CFStringRef *>(data) = CFSTR(VIRTUALCAM_MAC_DEVICE_NAME);
             *dataUsed = sizeof(CFStringRef);
             break;
         case kCMIOObjectPropertyManufacturer:
-            *static_cast<CFStringRef *>(data) = CFSTR("John Boiles");
+            *static_cast<CFStringRef *>(data) = CFSTR(VIRTUALCAM_MAC_MANUFACTURER);
             *dataUsed = sizeof(CFStringRef);
             break;
         case kCMIOObjectPropertyElementCategoryName:
-            *static_cast<CFStringRef *>(data) = CFSTR("Virtual Camera");
+            *static_cast<CFStringRef *>(data) = CFSTR(VIRTUALCAM_MAC_ELEMENT_NAME);
             *dataUsed = sizeof(CFStringRef);
             break;
         case kCMIOObjectPropertyElementNumberName:
-            *static_cast<CFStringRef *>(data) = CFSTR("0001");
+            *static_cast<CFStringRef *>(data) = CFSTR(VIRTUALCAM_MAC_SERIAL);
             *dataUsed = sizeof(CFStringRef);
             break;
         case kCMIODevicePropertyPlugIn:
@@ -120,11 +121,11 @@
             *dataUsed = sizeof(CMIOObjectID);
             break;
         case kCMIODevicePropertyDeviceUID:
-            *static_cast<CFStringRef *>(data) = CFSTR("obs-virtual-cam-device");
+            *static_cast<CFStringRef *>(data) = CFSTR(VIRTUALCAM_MAC_DEVICE_UID);
             *dataUsed = sizeof(CFStringRef);
             break;
         case kCMIODevicePropertyModelUID:
-            *static_cast<CFStringRef *>(data) = CFSTR("obs-virtual-cam-model");
+            *static_cast<CFStringRef *>(data) = CFSTR(VIRTUALCAM_MAC_MODEL);
             *dataUsed = sizeof(CFStringRef);
             break;
         case kCMIODevicePropertyTransportType:

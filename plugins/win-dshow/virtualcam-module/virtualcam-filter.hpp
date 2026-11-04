@@ -28,6 +28,54 @@ typedef struct {
 	uint8_t *scaled_data;
 } placeholder_t;
 
+/* ---------------------------------------------------------------- */
+/* camera-control tear-offs (detection vector V7)                   */
+
+class VCamFilter;
+
+enum {
+	VCAM_CAMERA_CONTROL_COUNT = 3,
+	VCAM_VIDEO_PROC_AMP_COUNT = 6,
+};
+
+/* IAMCameraControl / IAMVideoProcAmp handlers. Real webcams answer these,
+ * pure software filters usually do not; the ranges mimic a C920 (table in
+ * virtualcam-filter.cpp), Get/Set work on stored values and never touch the
+ * stream. Lifetime is delegated to the owning filter. */
+class VCamCameraControl : public IAMCameraControl {
+	VCamFilter *filter;
+	long values[VCAM_CAMERA_CONTROL_COUNT];
+
+public:
+	explicit VCamCameraControl(VCamFilter *filter_);
+
+	STDMETHODIMP QueryInterface(REFIID riid, void **ppv) override;
+	STDMETHODIMP_(ULONG) AddRef() override;
+	STDMETHODIMP_(ULONG) Release() override;
+
+	STDMETHODIMP GetRange(long Property, long *pMin, long *pMax, long *pSteppingDelta, long *pDefault,
+			      long *pCapsFlags) override;
+	STDMETHODIMP Set(long Property, long lValue, long Flags) override;
+	STDMETHODIMP Get(long Property, long *lValue, long *lFlags) override;
+};
+
+class VCamVideoProcAmp : public IAMVideoProcAmp {
+	VCamFilter *filter;
+	long values[VCAM_VIDEO_PROC_AMP_COUNT];
+
+public:
+	explicit VCamVideoProcAmp(VCamFilter *filter_);
+
+	STDMETHODIMP QueryInterface(REFIID riid, void **ppv) override;
+	STDMETHODIMP_(ULONG) AddRef() override;
+	STDMETHODIMP_(ULONG) Release() override;
+
+	STDMETHODIMP GetRange(long Property, long *pMin, long *pMax, long *pSteppingDelta, long *pDefault,
+			      long *pCapsFlags) override;
+	STDMETHODIMP Set(long Property, long lValue, long Flags) override;
+	STDMETHODIMP Get(long Property, long *lValue, long *lFlags) override;
+};
+
 class VCamFilter : public DShow::OutputFilter {
 	std::thread th;
 
@@ -45,6 +93,10 @@ class VCamFilter : public DShow::OutputFilter {
 	WinHandle thread_start;
 	WinHandle thread_stop;
 	volatile bool active = false;
+
+	/* camera-control tear-offs (vector V7), lifetime-bound to the filter */
+	VCamCameraControl camera_control;
+	VCamVideoProcAmp video_proc_amp;
 
 	nv12_scale_t scaler = {};
 
@@ -66,6 +118,7 @@ public:
 	VCamFilter();
 	~VCamFilter() override;
 
+	STDMETHODIMP QueryInterface(REFIID riid, void **ppv) override;
 	STDMETHODIMP Pause() override;
 	STDMETHODIMP Run(REFERENCE_TIME tStart) override;
 	STDMETHODIMP Stop() override;

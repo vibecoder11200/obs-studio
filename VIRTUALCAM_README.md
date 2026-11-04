@@ -9,7 +9,9 @@ virtual cameras). It does not make the camera undetectable at every level, and
 it is not intended to defeat proctoring, KYC or identity checks. Shipping a
 build with Logitech branding carries a trademark risk that is accepted by the
 fork maintainer; all brand strings are configurable via CMake variables if you
-need a neutral build.
+need a neutral build. The same applies to the **runtime identity presets**
+offered in the Virtual Camera configuration dialog (real-camera name/VID/PID
+bundles) — they present the same trademark exposure.
 
 ## Changes Made
 
@@ -190,6 +192,90 @@ Build a neutral-branded variant by overriding these variables — no source edit
 `tools/vcam-audit/Audit-VirtualCam.ps1` measures how distinguishable the
 virtual camera is from a physical webcam (9 detection vectors) and gates
 packages in CI against OBS fingerprints. See `tools/vcam-audit/README.md`.
+
+Per-OS audit scripts:
+
+- Windows: `tools/vcam-audit/Audit-VirtualCam.ps1` (requires PowerShell 7:
+  `winget install Microsoft.PowerShell`; PS 5.1 is not supported)
+- macOS: `tools/vcam-audit-macos/audit-virtualcam.sh` (requires Xcode command
+  line tools; run `sudo ./audit-virtualcam.sh`)
+- Linux: `tools/vcam-audit-linux/audit-virtualcam.sh` (requires `v4l-utils`)
+
+Every release ships the Windows audit harness inside the package under
+`auxdata/vcam-audit/`.
+
+### Runtime identity (Windows)
+
+The camera identity can be changed **without a rebuild**:
+
+- OBS → Virtual Camera configuration dialog → *Virtual Camera Identity*:
+  pick a preset (C920 / Brio 500 / Generic UVC / Custom), optionally a serial,
+  and **Apply**. OBS launches `vcamctl.exe` elevated (UAC) and re-registers
+  the camera.
+- CLI: `core\win-dshow\data\vcamctl.exe` with `get`, `set --name N --vid HHHH
+  --pid HHHH [--serial S]`, `reset`, `register`, `unregister`.
+
+Overrides are stored under `HKLM\SOFTWARE\Logitech\Identity` (admin-writable
+only) and apply at the next registration. The CLSID/GUID intentionally stays
+compile-time. Two caveats:
+
+- Conferencing apps that currently hold the camera may lose it until they are
+  restarted (the re-register briefly removes the device).
+- Verify the result with the audit scan — no rebuild needed, just re-run
+  `Audit-VirtualCam.ps1 scan`.
+
+## Cross-platform identity (macOS / Linux)
+
+The same C920 identity story is compiled into the macOS and Linux virtual
+cameras; defaults keep stock builds, presets override:
+
+- **macOS** (`VIRTUALCAM_MAC_*`): device name (AVFoundation/CMIO),
+  manufacturer, model/serial/UID, plugin file name (`LogiCamera.plugin`
+  instead of `obs-mac-virtualcam.plugin`), bundle IDs
+  (`com.logitech.webcam.*`), mach service. Both the DAL plugin and the CMIO
+  camera extension are rebranded. **Signing caveat:** without a Developer ID
+  the camera extension is ad-hoc signed; activating it needs
+  `systemextensionsctl developer on` (SIP reduced) — personal use only. The
+  ad-hoc team identifier in `codesign -dv` is the documented residual tell.
+- **Linux**: OBS loads the forked **vcamuvc** module
+  (`plugins/linux-v4l2/v4l2loopback-vcam`, DKMS source deb
+  `vcamuvc-dkms_*.deb`). `v4l2-ctl -D` reports driver `uvcvideo`, card
+  `HD Pro Webcam C920`, a USB bus_info, discrete C920 sizes at 30 fps.
+  Residual tells (documented, not fixable in a userland module):
+  `lsmod` shows `vcamuvc`, sysfs exposes a virtual platform device, `lsusb`
+  has no entry. If the stock `v4l2loopback` is loaded, OBS prefers
+  `vcamuvc` devices; blacklisting the stock module via modprobe.d keeps the
+  identity stable.
+
+### Detection vector matrix
+
+| Vector | Windows | macOS | Linux |
+|---|---|---|---|
+| V1 device name | PASS (registry friendly name) | PASS (AVFoundation name) | PASS (`v4l2-ctl -D` card) |
+| V2 CLSID/bundle | PASS (unique GUID) | PASS (bundle IDs) | n/a |
+| V3 DevicePath | PASS (USB-format, per-machine serial) | n/a | n/a |
+| V4 PnP/sysfs | PASS | n/a | **FAIL (by design)** — virtual platform device, no lsusb |
+| V5 metadata/signature | PASS (VERSIONINFO) | **LIMIT** — ad-hoc signature without Developer ID | PASS (driver name `uvcvideo`) |
+| V6 classification | PASS | PASS | PASS |
+| V7 camera controls | PASS (IAMCameraControl/IAMVideoProcAmp) | n/a | n/a |
+| V8 named objects/artifacts | PASS (renamed queue/config) | PASS (DAL file name) | **LIMIT** — discrete sizes OK; module visible |
+| V9 support files | PASS (no OBS artifacts) | PASS (no camera-path artifacts) | **LIMIT** — `lsmod`/`dkms` show `vcamuvc` (documented) |
+
+"LIMIT" rows are the honest architecture ceilings described above; the audit
+scripts record them instead of hiding them.
+
+### Release pipeline
+
+Tag pushes (`v*`) and manual dispatches build:
+
+- Windows: portable ZIP (`portable_mode` marker + `auxdata/vcam-audit/`) and
+  Inno Setup installer (`.exe`)
+- macOS: unsigned `.dmg` for Apple Silicon and Intel
+- Linux: `.deb`, portable `tar.gz` (with `run-portable.sh`), and the
+  `vcamuvc-dkms` module deb
+
+Workflows: `.github/workflows/build-windows.yml` (release owner),
+`build-macos.yml`, `build-linux.yml` (upload into the same release).
 
 ### Files Modified
 

@@ -64,7 +64,16 @@ static int run_command(const char *command)
 	return result;
 }
 
-static bool loopback_module_loaded()
+/* Neutral module name and card label for the virtual camera. The forked
+ * vcamuvc module (vendored v4l2loopback with the identity patch) reports a
+ * real UVC identity; the stock v4l2loopback stays as a fallback with the
+ * same label, but the audit tool flags its driver-name tell.
+ * VIRTUALCAM_LINUX_CARD_LABEL is threaded from CMakePresets.json. */
+#ifndef VIRTUALCAM_LINUX_CARD_LABEL
+#define VIRTUALCAM_LINUX_CARD_LABEL "OBS Virtual Camera"
+#endif
+
+static bool loopback_module_loaded_name(const char *module)
 {
 	bool loaded = false;
 
@@ -76,7 +85,7 @@ static bool loopback_module_loaded()
 		return false;
 
 	while (fgets(temp, sizeof(temp), fp)) {
-		if (strstr(temp, "v4l2loopback")) {
+		if (strstr(temp, module)) {
 			loaded = true;
 			break;
 		}
@@ -87,23 +96,58 @@ static bool loopback_module_loaded()
 	return loaded;
 }
 
+static bool loopback_module_loaded()
+{
+	/* the forked module first: if both are loaded, it owns the identity */
+	return loopback_module_loaded_name("vcamuvc") ||
+	       loopback_module_loaded_name("v4l2loopback");
+}
+
 bool loopback_module_available()
 {
 	if (loopback_module_loaded()) {
 		return true;
 	}
 
-	if (run_command("modinfo v4l2loopback >/dev/null 2>&1") == 0) {
+	if (run_command("modinfo vcamuvc >/dev/null 2>&1") == 0 ||
+	    run_command("modinfo v4l2loopback >/dev/null 2>&1") == 0) {
 		return true;
 	}
 
 	return false;
 }
 
+static int modprobe_with_label(const char *module)
+{
+	struct dstr command = {0};
+	struct dstr label = {0};
+	int result;
+
+	dstr_init_copy(&label, VIRTUALCAM_LINUX_CARD_LABEL);
+	/* the label lands inside a single-quoted shell argument; escape any
+	   single quote instead of letting it break out of the quoting */
+	dstr_replace(&label, "'", "'\\''");
+
+	dstr_init_copy(&command, "pkexec modprobe ");
+	dstr_cat(&command, module);
+	dstr_cat(&command, " exclusive_caps=1 card_label='");
+	dstr_cat(&command, label.array);
+	dstr_cat(&command, "' && sleep 0.5");
+	result = run_command(command.array);
+
+	dstr_free(&command);
+	dstr_free(&label);
+	return result;
+}
+
 static int loopback_module_load()
 {
-	return run_command(
-		"pkexec modprobe v4l2loopback exclusive_caps=1 card_label='OBS Virtual Camera' && sleep 0.5");
+	/* prefer the forked module (real UVC identity); fall back to the
+	   stock module, whose `v4l2 loopback` driver name stays detectable */
+	if (modprobe_with_label("vcamuvc") == 0)
+		return 0;
+
+	return modprobe_with_label("v4l2loopback");
 }
 #else
 bool loopback_module_available()
@@ -142,7 +186,7 @@ static void *virtualcam_create(obs_data_t *settings, obs_output_t *output)
 	return vcam;
 }
 
-static bool try_connect(void *data, const char *device)
+static bool try_connect(void *data, const char *device, bool forked_only)
 {
 	static bool use_caps_workaround = false;
 	struct virtualcam_data *vcam = (struct virtualcam_data *)data;
@@ -161,6 +205,11 @@ static bool try_connect(void *data, const char *device)
 		return false;
 
 	if (ioctl(vcam->device, VIDIOC_QUERYCAP, &capability) < 0)
+		goto fail_close_device;
+
+	/* prefer devices backed by the forked module (they report the real
+	   UVC identity); stock v4l2loopback stays a fallback in the second pass */
+	if (forked_only && strcmp((const char *)capability.driver, "uvcvideo") != 0)
 		goto fail_close_device;
 
 	if (!(capability.device_caps & V4L2_CAP_VIDEO_OUTPUT))
@@ -236,7 +285,9 @@ static bool virtualcam_start(void *data)
 	int n;
 
 #if defined(__linux__)
-	if (!loopback_module_loaded()) {
+	/* only the forked module counts as "already loaded": with the stock
+	   module alone, still load the forked one so the identity holds */
+	if (!loopback_module_loaded_name("vcamuvc")) {
 		if (loopback_module_load() != 0)
 			return false;
 	}
@@ -253,23 +304,29 @@ static bool virtualcam_start(void *data)
 	if (n == -1)
 		return false;
 
-	for (int i = 0; i < n; i++) {
-		char device[32] = {0};
+	for (int pass = 0; pass < 2 && !success; pass++) {
+		/* the first pass prefers forked-module devices (real UVC identity),
+		   the second pass accepts any loopback device as a fallback */
+		bool forked_only = pass == 0;
+
+		for (int i = 0; i < n; i++) {
+			char device[32] = {0};
 
 #if !defined(__linux__)
-		if (strstr(list[i]->d_name, "video") != list[i]->d_name)
-			continue;
+			if (strstr(list[i]->d_name, "video") != list[i]->d_name)
+				continue;
 #endif
 
-		// Use the return value of snprintf to prevent truncation warning.
-		int written = snprintf(device, 32, "/dev/%s", list[i]->d_name);
-		if (written >= 32)
-			blog(LOG_DEBUG, "v4l2-output: A format truncation may have occurred."
-					" This can be ignored since it is quite improbable.");
+			// Use the return value of snprintf to prevent truncation warning.
+			int written = snprintf(device, 32, "/dev/%s", list[i]->d_name);
+			if (written >= 32)
+				blog(LOG_DEBUG, "v4l2-output: A format truncation may have occurred."
+						" This can be ignored since it is quite improbable.");
 
-		if (try_connect(vcam, device)) {
-			success = true;
-			break;
+			if (try_connect(vcam, device, forked_only)) {
+				success = true;
+				break;
+			}
 		}
 	}
 

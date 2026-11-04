@@ -6,3 +6,8 @@
 
 #define VIRTUALCAM_BRAND_NAME_W L"@VIRTUALCAM_BRAND_NAME@"
 #define VIRTUALCAM_BRAND_COMPANY_W L"@VIRTUALCAM_BRAND_COMPANY@"
+
+/* Runtime identity overrides written by vcamctl under HKLM (admin-writable
+ * only) and honored by DllRegisterServer: values Name/Serial/Vid/Pid replace
+ * the compiled identity at registration time. */
+#define VIRTUALCAM_IDENTITY_KEY_W L"SOFTWARE\\" VIRTUALCAM_BRAND_COMPANY_W L"\\Identity"

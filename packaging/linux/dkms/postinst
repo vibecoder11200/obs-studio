@@ -1,0 +1,30 @@
+#!/bin/sh
+# dkms add/build/install for vcamuvc; the build is best-effort and non-fatal
+# (locked-down kernels without headers degrade gracefully; documented in the
+# fork README).
+set -e
+
+SRC_DIR="$(ls -d /usr/src/vcamuvc-* 2>/dev/null | head -n 1 || true)"
+
+if [ -z "$SRC_DIR" ] || ! command -v dkms >/dev/null 2>&1; then
+	echo "vcamuvc-dkms: dkms or source tree missing; module not built" >&2
+	exit 0
+fi
+
+MODULE_VERSION="${SRC_DIR#/usr/src/vcamuvc-}"
+KERNEL="$(uname -r)"
+
+dkms add -m vcamuvc -v "$MODULE_VERSION" >/dev/null 2>&1 || true
+
+if dkms build -m vcamuvc -v "$MODULE_VERSION" -k "$KERNEL" >/dev/null 2>&1; then
+	if dkms install -m vcamuvc -v "$MODULE_VERSION" -k "$KERNEL" >/dev/null 2>&1; then
+		echo "vcamuvc-dkms: module installed for $KERNEL (modprobe vcamuvc)"
+		exit 0
+	fi
+fi
+
+echo "vcamuvc-dkms: DKMS build failed for $KERNEL." >&2
+echo "vcamuvc-dkms: install kernel headers (linux-headers-$KERNEL), then run:" >&2
+echo "vcamuvc-dkms:   sudo dkms build -m vcamuvc -v $MODULE_VERSION -k $KERNEL && sudo dkms install -m vcamuvc -v $MODULE_VERSION -k $KERNEL" >&2
+echo "vcamuvc-dkms: falling back to the stock v4l2loopback (shallow identity) is automatic." >&2
+exit 0

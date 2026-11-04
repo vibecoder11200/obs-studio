@@ -15,7 +15,190 @@ extern volatile long locks;
 
 /* ========================================================================= */
 
-VCamFilter::VCamFilter() : OutputFilter()
+/* Camera-control surfaces (vector V7). Properties a real C920 does not
+ * expose (pan/tilt/iris, hue/gamma/...) are absent from the tables and
+ * answer E_PROP_ID_UNSUPPORTED, which is what the hardware does. */
+struct VCamControlRange {
+	long property;
+	long min;
+	long max;
+	long step;
+	long def;
+	long caps;
+};
+
+static const VCamControlRange camera_control_ranges[VCAM_CAMERA_CONTROL_COUNT] = {
+	{CameraControl_Zoom, 100, 400, 10, 100, CameraControl_Flags_Manual},
+	{CameraControl_Exposure, -13, 0, 1, -6, CameraControl_Flags_Auto | CameraControl_Flags_Manual},
+	{CameraControl_Focus, 0, 250, 5, 0, CameraControl_Flags_Auto | CameraControl_Flags_Manual},
+};
+
+static const VCamControlRange video_proc_amp_ranges[VCAM_VIDEO_PROC_AMP_COUNT] = {
+	{VideoProcAmp_Brightness, 0, 255, 1, 128, VideoProcAmp_Flags_Manual},
+	{VideoProcAmp_Contrast, 0, 255, 1, 128, VideoProcAmp_Flags_Manual},
+	{VideoProcAmp_Saturation, 0, 255, 1, 128, VideoProcAmp_Flags_Manual},
+	{VideoProcAmp_Sharpness, 0, 255, 1, 128, VideoProcAmp_Flags_Manual},
+	{VideoProcAmp_WhiteBalance, 2000, 6500, 10, 4000, VideoProcAmp_Flags_Auto | VideoProcAmp_Flags_Manual},
+	{VideoProcAmp_Gain, 0, 255, 1, 128, VideoProcAmp_Flags_Manual},
+};
+
+static int VCamPropFind(const VCamControlRange *table, int count, long property)
+{
+	for (int i = 0; i < count; i++) {
+		if (table[i].property == property) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+static HRESULT VCamPropGetRange(const VCamControlRange *table, int count, long property, long *pMin, long *pMax,
+				long *pSteppingDelta, long *pDefault, long *pCapsFlags)
+{
+	int i = VCamPropFind(table, count, property);
+	if (i < 0) {
+		return E_PROP_ID_UNSUPPORTED;
+	}
+
+	if (pMin) {
+		*pMin = table[i].min;
+	}
+	if (pMax) {
+		*pMax = table[i].max;
+	}
+	if (pSteppingDelta) {
+		*pSteppingDelta = table[i].step;
+	}
+	if (pDefault) {
+		*pDefault = table[i].def;
+	}
+	if (pCapsFlags) {
+		*pCapsFlags = table[i].caps;
+	}
+
+	return S_OK;
+}
+
+static HRESULT VCamPropSet(const VCamControlRange *table, int count, long *values, long property, long value)
+{
+	int i = VCamPropFind(table, count, property);
+	if (i < 0) {
+		return E_PROP_ID_UNSUPPORTED;
+	}
+
+	if (value < table[i].min || value > table[i].max) {
+		return E_INVALIDARG;
+	}
+
+	values[i] = value;
+	return S_OK;
+}
+
+static HRESULT VCamPropGet(const VCamControlRange *table, int count, const long *values, long property, long *value,
+			   long *flags, long manual_flags)
+{
+	int i = VCamPropFind(table, count, property);
+	if (i < 0) {
+		return E_PROP_ID_UNSUPPORTED;
+	}
+
+	if (value) {
+		*value = values[i];
+	}
+	if (flags) {
+		*flags = manual_flags;
+	}
+
+	return S_OK;
+}
+
+VCamCameraControl::VCamCameraControl(VCamFilter *filter_) : filter(filter_)
+{
+	for (int i = 0; i < VCAM_CAMERA_CONTROL_COUNT; i++) {
+		values[i] = camera_control_ranges[i].def;
+	}
+}
+
+STDMETHODIMP VCamCameraControl::QueryInterface(REFIID riid, void **ppv)
+{
+	return filter->QueryInterface(riid, ppv);
+}
+
+STDMETHODIMP_(ULONG) VCamCameraControl::AddRef()
+{
+	return filter->AddRef();
+}
+
+STDMETHODIMP_(ULONG) VCamCameraControl::Release()
+{
+	return filter->Release();
+}
+
+STDMETHODIMP VCamCameraControl::GetRange(long Property, long *pMin, long *pMax, long *pSteppingDelta, long *pDefault,
+					 long *pCapsFlags)
+{
+	return VCamPropGetRange(camera_control_ranges, VCAM_CAMERA_CONTROL_COUNT, Property, pMin, pMax, pSteppingDelta,
+				pDefault, pCapsFlags);
+}
+
+STDMETHODIMP VCamCameraControl::Set(long Property, long lValue, long)
+{
+	return VCamPropSet(camera_control_ranges, VCAM_CAMERA_CONTROL_COUNT, values, Property, lValue);
+}
+
+STDMETHODIMP VCamCameraControl::Get(long Property, long *lValue, long *lFlags)
+{
+	return VCamPropGet(camera_control_ranges, VCAM_CAMERA_CONTROL_COUNT, values, Property, lValue, lFlags,
+			   CameraControl_Flags_Manual);
+}
+
+VCamVideoProcAmp::VCamVideoProcAmp(VCamFilter *filter_) : filter(filter_)
+{
+	for (int i = 0; i < VCAM_VIDEO_PROC_AMP_COUNT; i++) {
+		values[i] = video_proc_amp_ranges[i].def;
+	}
+}
+
+STDMETHODIMP VCamVideoProcAmp::QueryInterface(REFIID riid, void **ppv)
+{
+	return filter->QueryInterface(riid, ppv);
+}
+
+STDMETHODIMP_(ULONG) VCamVideoProcAmp::AddRef()
+{
+	return filter->AddRef();
+}
+
+STDMETHODIMP_(ULONG) VCamVideoProcAmp::Release()
+{
+	return filter->Release();
+}
+
+STDMETHODIMP VCamVideoProcAmp::GetRange(long Property, long *pMin, long *pMax, long *pSteppingDelta, long *pDefault,
+					long *pCapsFlags)
+{
+	return VCamPropGetRange(video_proc_amp_ranges, VCAM_VIDEO_PROC_AMP_COUNT, Property, pMin, pMax, pSteppingDelta,
+				pDefault, pCapsFlags);
+}
+
+STDMETHODIMP VCamVideoProcAmp::Set(long Property, long lValue, long)
+{
+	return VCamPropSet(video_proc_amp_ranges, VCAM_VIDEO_PROC_AMP_COUNT, values, Property, lValue);
+}
+
+STDMETHODIMP VCamVideoProcAmp::Get(long Property, long *lValue, long *lFlags)
+{
+	return VCamPropGet(video_proc_amp_ranges, VCAM_VIDEO_PROC_AMP_COUNT, values, Property, lValue, lFlags,
+			   VideoProcAmp_Flags_Manual);
+}
+
+/* ========================================================================= */
+
+VCamFilter::VCamFilter()
+	: OutputFilter(),
+	  camera_control(this),
+	  video_proc_amp(this)
 {
 	thread_start = CreateEvent(nullptr, true, false, nullptr);
 	thread_stop = CreateEvent(nullptr, true, false, nullptr);
@@ -118,6 +301,29 @@ VCamFilter::~VCamFilter()
 const wchar_t *VCamFilter::FilterName() const
 {
 	return L"VCamFilter";
+}
+
+/* Exposes the camera-control tear-offs (vector V7) alongside the base
+ * filter interfaces; everything else falls through to OutputFilter. */
+STDMETHODIMP VCamFilter::QueryInterface(REFIID riid, void **ppv)
+{
+	if (!ppv) {
+		return E_POINTER;
+	}
+
+	if (riid == IID_IAMCameraControl) {
+		AddRef();
+		*ppv = static_cast<IAMCameraControl *>(&camera_control);
+		return S_OK;
+	}
+
+	if (riid == IID_IAMVideoProcAmp) {
+		AddRef();
+		*ppv = static_cast<IAMVideoProcAmp *>(&video_proc_amp);
+		return S_OK;
+	}
+
+	return OutputFilter::QueryInterface(riid, ppv);
 }
 
 STDMETHODIMP VCamFilter::Pause()

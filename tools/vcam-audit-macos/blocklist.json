@@ -1,0 +1,33 @@
+{
+  "$schema_note": "Known virtual camera fingerprints used by audit-virtualcam.sh on macOS. name_patterns are case-insensitive substrings matched against AVFoundation device names and CMIO object names (V1); bundle_ids are matched against camera-extension registrations and DAL bundle identifiers (V2/V9); file_patterns are matched against installed DAL plugin file names and bundle contents (V8); signature records what codesign -dv reports for the installed bundles (V5, informational).",
+  "schema": 1,
+  "name_patterns": [
+    { "pattern": "obs virtual", "product": "OBS Studio" },
+    { "pattern": "obs virtual camera", "product": "OBS Studio" },
+    { "pattern": "virtual camera", "product": "generic virtual camera" },
+    { "pattern": "virtualcamera", "product": "generic virtual camera" },
+    { "pattern": "obs-camera", "product": "OBS Studio (mac virtualcam)" },
+    { "pattern": "obs-mac-virtualcam", "product": "OBS Studio (mac virtualcam)" },
+    { "pattern": "manycam", "product": "ManyCam" },
+    { "pattern": "camtwist", "product": "CamTwist" },
+    { "pattern": "droidcam", "product": "DroidCam" },
+    { "pattern": "iriun", "product": "Iriun Webcam" },
+    { "pattern": "epoccam", "product": "EpocCam" },
+    { "pattern": "snap camera", "product": "Snap Camera" },
+    { "pattern": "xsplit vcam", "product": "XSplit VCam" }
+  ],
+  "bundle_ids": [
+    { "pattern": "com.obsproject", "product": "OBS Studio (mac virtualcam bundle id)" },
+    { "pattern": "com.philippe.hualt manycam", "product": "ManyCam" },
+    { "pattern": "com.twistrun.camtwist", "product": "CamTwist" },
+    { "pattern": "com.dev47apps.droidcam", "product": "DroidCam" },
+    { "pattern": "com.snapchat.snapcamera", "product": "Snap Camera" }
+  ],
+  "file_patterns": [
+    { "pattern": "obs-mac-virtualcam", "product": "OBS Studio (mac virtualcam DAL plugin file)" },
+    { "pattern": "virtual-cam", "product": "generic virtual camera DAL plugin file" }
+  ],
+  "signature": {
+    "note": "codesign -dv output recorded verbatim; an ad-hoc ('linker-signed') signature on the camera extension is the documented residual tell of an unsigned build and degrades V5 to WARN, not FAIL."
+  }
+}

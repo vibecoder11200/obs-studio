@@ -3,6 +3,8 @@
 #include "virtualcam-brand.h"
 #include "virtualcam-device.h"
 
+#include <wctype.h>
+
 /* ========================================================================= */
 
 static const REGPINTYPES AMSMediaTypesV = {&MEDIATYPE_Video, &MEDIASUBTYPE_NV12};
@@ -102,6 +104,78 @@ static inline DWORD string_size(const wchar_t *str)
 	return (DWORD)(wcslen(str) + 1) * sizeof(wchar_t);
 }
 
+/* ------------------------------------------------------------------------ */
+/* Runtime identity overrides                                               */
+/*                                                                          */
+/* vcamctl writes Name/Serial/Vid/Pid under HKLM\VIRTUALCAM_IDENTITY_KEY_W; */
+/* registration applies them over the compiled identity. The key lives in   */
+/* the 64-bit HKLM view (both module architectures read the same values)    */
+/* and is writable by administrators only. Missing or invalid values fall   */
+/* back to the compiled defaults.                                           */
+
+static bool RegReadIdentityValue(const wchar_t *value, wchar_t *out, size_t out_chars)
+{
+	DWORD size = (DWORD)(out_chars * sizeof(wchar_t));
+
+	out[0] = L'\0';
+	return RegGetValueW(HKEY_LOCAL_MACHINE, VIRTUALCAM_IDENTITY_KEY_W, value, RRF_RT_REG_SZ | RRF_SUBKEY_WOW6464KEY,
+			    nullptr, out, &size) == ERROR_SUCCESS &&
+	       out[0] != L'\0';
+}
+
+static bool RegValidHex(const wchar_t *str)
+{
+	size_t len = wcslen(str);
+
+	if (len != 4) {
+		return false;
+	}
+
+	for (const wchar_t *p = str; *p; ++p) {
+		if (!iswxdigit(*p)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static void RegLowercase(wchar_t *str)
+{
+	for (; *str; ++str) {
+		*str = (wchar_t)towlower(*str);
+	}
+}
+
+/* Loads the effective identity for this registration: name and vidpid are
+ * always filled (override or compiled default), serial receives the registry
+ * serial or an empty string (empty = keep the compiled/derived serial). */
+static void LoadIdentityOverrides(wchar_t *name, size_t name_chars, wchar_t *vidpid, size_t vidpid_chars,
+				  wchar_t *serial, size_t serial_chars)
+{
+	wchar_t override_name[128];
+	wchar_t vid[16];
+	wchar_t pid[16];
+
+	StringCbCopyW(name, name_chars * sizeof(wchar_t), VIRTUALCAM_BRAND_NAME_W);
+	StringCbCopyW(vidpid, vidpid_chars * sizeof(wchar_t), VIRTUALCAM_DEVICE_VIDPID_W);
+	serial[0] = L'\0';
+
+	if (RegReadIdentityValue(L"Name", override_name, _countof(override_name))) {
+		StringCbCopyW(name, name_chars * sizeof(wchar_t), override_name);
+	}
+
+	/* Result ignored: an absent Serial keeps the derived/compiled one. */
+	RegReadIdentityValue(L"Serial", serial, serial_chars);
+
+	if (RegReadIdentityValue(L"Vid", vid, _countof(vid)) && RegReadIdentityValue(L"Pid", pid, _countof(pid)) &&
+	    RegValidHex(vid) && RegValidHex(pid)) {
+		RegLowercase(vid);
+		RegLowercase(pid);
+		StringCbPrintfW(vidpid, vidpid_chars * sizeof(wchar_t), L"vid_%s&pid_%s", vid, pid);
+	}
+}
+
 static bool RegServer(const CLSID &cls, const wchar_t *desc, const wchar_t *file, const wchar_t *model = L"Both",
 		      const wchar_t *type = L"InprocServer32")
 {
@@ -152,7 +226,7 @@ static bool UnregServer(const CLSID &cls)
 	return RegDeleteTreeW(HKEY_CLASSES_ROOT, temp) == ERROR_SUCCESS;
 }
 
-static bool RegServers(bool reg)
+static bool RegServers(const wchar_t *name)
 {
 	wchar_t file[MAX_PATH];
 
@@ -160,22 +234,20 @@ static bool RegServers(bool reg)
 		return false;
 	}
 
-	if (reg) {
-		return RegServer(CLSID_OBS_VirtualVideo, VIRTUALCAM_BRAND_NAME_W, file);
-	} else {
-		return UnregServer(CLSID_OBS_VirtualVideo);
-	}
+	return RegServer(CLSID_OBS_VirtualVideo, name, file);
 }
 
 /* Writes the USB-style DevicePath value under the filter's category Instance
    key, where apps (Skype/Unity-era checkers) read it for physical cameras.
    UnregisterFilter removes the whole Instance tree, so no extra cleanup is
    needed beyond the defensive delete in DllUnregisterServer. */
-static bool RegFilterDevicePath(const CLSID &clsid)
+static bool RegFilterDevicePath(const CLSID &clsid, const wchar_t *vidpid, const wchar_t *serial_override)
 {
 	wchar_t serial[16] = L"";
 
-	if (VIRTUALCAM_DEVICE_SERIAL_W[0] != L'\0') {
+	if (serial_override[0] != L'\0') {
+		StringCbCopyW(serial, sizeof(serial), serial_override);
+	} else if (VIRTUALCAM_DEVICE_SERIAL_W[0] != L'\0') {
 		StringCbCopyW(serial, sizeof(serial), VIRTUALCAM_DEVICE_SERIAL_W);
 	} else {
 		/* Derive a stable per-machine serial: FNV-1a over MachineGuid. */
@@ -209,8 +281,8 @@ static bool RegFilterDevicePath(const CLSID &clsid)
 	if (FAILED(StringCbPrintfW(key_path, sizeof(key_path), L"CLSID\\%s\\Instance\\%s", category_str, cls_str))) {
 		return false;
 	}
-	if (FAILED(StringCbPrintfW(device_path, sizeof(device_path), L"\\\\?\\usb#%s#%s#%s",
-				   VIRTUALCAM_DEVICE_VIDPID_W, serial, VIRTUALCAM_DEVICE_INTERFACE_W))) {
+	if (FAILED(StringCbPrintfW(device_path, sizeof(device_path), L"\\\\?\\usb#%s#%s#%s", vidpid, serial,
+				   VIRTUALCAM_DEVICE_INTERFACE_W))) {
 		return false;
 	}
 
@@ -227,7 +299,28 @@ static bool RegFilterDevicePath(const CLSID &clsid)
 	return status == ERROR_SUCCESS;
 }
 
-static bool RegFilters(bool reg)
+static bool RegFilters(const wchar_t *name)
+{
+	ComPtr<IFilterMapper2> fm;
+	ComPtr<IMoniker> moniker;
+	HRESULT hr;
+
+	hr = CoCreateInstance(CLSID_FilterMapper2, nullptr, CLSCTX_INPROC_SERVER, IID_IFilterMapper2, (void **)&fm);
+	if (FAILED(hr)) {
+		return false;
+	}
+
+	REGFILTER2 rf2;
+	rf2.dwVersion = 1;
+	rf2.dwMerit = MERIT_DO_NOT_USE;
+	rf2.cPins = 1;
+	rf2.rgPins = &AMSPinVideo;
+
+	return SUCCEEDED(fm->RegisterFilter(CLSID_OBS_VirtualVideo, name, &moniker, &CLSID_VideoInputDeviceCategory,
+					    nullptr, &rf2));
+}
+
+static bool UnregFilters()
 {
 	ComPtr<IFilterMapper2> fm;
 	HRESULT hr;
@@ -237,50 +330,37 @@ static bool RegFilters(bool reg)
 		return false;
 	}
 
-	if (reg) {
-		ComPtr<IMoniker> moniker;
-		REGFILTER2 rf2;
-		rf2.dwVersion = 1;
-		rf2.dwMerit = MERIT_DO_NOT_USE;
-		rf2.cPins = 1;
-		rf2.rgPins = &AMSPinVideo;
-
-		hr = fm->RegisterFilter(CLSID_OBS_VirtualVideo, VIRTUALCAM_BRAND_NAME_W, &moniker,
-					&CLSID_VideoInputDeviceCategory, nullptr, &rf2);
-		if (FAILED(hr)) {
-			return false;
-		}
-	} else {
-		hr = fm->UnregisterFilter(&CLSID_VideoInputDeviceCategory, 0, CLSID_OBS_VirtualVideo);
-		if (FAILED(hr)) {
-			return false;
-		}
-	}
-
-	return true;
+	return SUCCEEDED(fm->UnregisterFilter(&CLSID_VideoInputDeviceCategory, 0, CLSID_OBS_VirtualVideo));
 }
 
 /* ========================================================================= */
 
 STDAPI DllRegisterServer()
 {
-	if (!RegServers(true)) {
-		RegServers(false);
+	wchar_t name[128];
+	wchar_t vidpid[40];
+	wchar_t serial_override[16];
+
+	LoadIdentityOverrides(name, _countof(name), vidpid, _countof(vidpid), serial_override,
+			      _countof(serial_override));
+
+	if (!RegServers(name)) {
+		UnregServer(CLSID_OBS_VirtualVideo);
 		return E_FAIL;
 	}
 
 	CoInitialize(0);
 
-	if (!RegFilters(true)) {
-		RegFilters(false);
-		RegServers(false);
+	if (!RegFilters(name)) {
+		UnregFilters();
+		UnregServer(CLSID_OBS_VirtualVideo);
 		CoUninitialize();
 		return E_FAIL;
 	}
 
 	/* Best effort: a missing DevicePath degrades to a detectable device,
 	   not to a broken one. */
-	RegFilterDevicePath(CLSID_OBS_VirtualVideo);
+	RegFilterDevicePath(CLSID_OBS_VirtualVideo, vidpid, serial_override);
 
 	CoUninitialize();
 	return S_OK;
@@ -289,7 +369,7 @@ STDAPI DllRegisterServer()
 STDAPI DllUnregisterServer()
 {
 	CoInitialize(0);
-	RegFilters(false);
+	UnregFilters();
 
 	/* Defensive: UnregisterFilter removes the Instance tree, but if a
 	   previous registration left residue, clean only OUR Instance subtree -
@@ -303,7 +383,7 @@ STDAPI DllUnregisterServer()
 		RegDeleteTreeW(HKEY_CLASSES_ROOT, key_path);
 	}
 
-	RegServers(false);
+	UnregServer(CLSID_OBS_VirtualVideo);
 	CoUninitialize();
 	return S_OK;
 }

@@ -9,6 +9,7 @@
 !/docs
 !/frontend
 !/libobs*
+!/packaging
 !/plugins
 !/shared
 !/test
@@ -33,6 +34,7 @@
 !COPYING
 !INSTALL
 !README.rst
+!VIRTUALCAM_README.md
 
 # Exclude lock files
 *.lock.json

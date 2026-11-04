@@ -25,6 +25,7 @@
 #import "Logging.h"
 #import "CMSampleBufferUtils.h"
 #import "OBSDALPlugIn.h"
+#import "vcam-brand-macos.h"
 
 @interface OBSDALStream () {
     CMSimpleQueueRef _queue;
@@ -110,7 +111,7 @@
 - (CFTypeRef)clock
 {
     if (_clock == NULL) {
-        OSStatus err = CMIOStreamClockCreate(kCFAllocatorDefault, CFSTR("obs-mac-virtualcam::Stream::clock"),
+        OSStatus err = CMIOStreamClockCreate(kCFAllocatorDefault, CFSTR(VIRTUALCAM_MAC_DEVICE_UID "::Stream::clock"),
                                              (__bridge void *) self, CMTimeMake(1, 10), 100, 10, &_clock);
         if (err != noErr) {
             DLog(@"Error %d from CMIOStreamClockCreate", err);
@@ -426,11 +427,11 @@
 {
     switch (address.mSelector) {
         case kCMIOObjectPropertyName:
-            *static_cast<CFStringRef *>(data) = CFSTR("OBS Virtual Camera");
+            *static_cast<CFStringRef *>(data) = CFSTR(VIRTUALCAM_MAC_DEVICE_NAME);
             *dataUsed = sizeof(CFStringRef);
             break;
         case kCMIOObjectPropertyElementName:
-            *static_cast<CFStringRef *>(data) = CFSTR("OBS Virtual Camera Stream Element");
+            *static_cast<CFStringRef *>(data) = CFSTR(VIRTUALCAM_MAC_DEVICE_NAME " Stream Element");
             *dataUsed = sizeof(CFStringRef);
             break;
         case kCMIOObjectPropertyManufacturer:

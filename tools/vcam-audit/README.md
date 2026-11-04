@@ -84,12 +84,34 @@ while OBS streams.
 Do not narrow this gate as a "mitigation"; any scope change requires re-running
 the baseline diff against a real webcam per the plan.
 
+## Shipped in every release
+
+The packaging step copies this directory (script, blocklist, vectors, README —
+no samples) into the package under `auxdata/vcam-audit/`, so users can verify
+the camera identity without leaving the release. It still requires PowerShell
+7 (`winget install Microsoft.PowerShell`); PS 5.1 compatibility is explicitly
+out of scope.
+
+## Runtime identity helper
+
+`vcamctl.exe` (shipped next to the camera DLLs under `core\win-dshow\data\`)
+changes the identity at runtime: `get` prints what the next registration will
+apply, `set --name N --vid HHHH --pid HHHH [--serial S]` writes the override
+under `HKLM\SOFTWARE\Logitech\Identity` (admin-writable only) and
+re-registers, `reset` returns to the build defaults. After any change, re-run
+this scan — no rebuild is needed. The presets offered in the OBS dialog use
+the same mechanism; `check-preset-coherence.ps1` (CI) guarantees they never
+collide with this blocklist.
+
 ## CI wiring
 
-See `.github/workflows/build-windows.yml` ("Antidetect Audit" step): runs
-`static` on the packaged zip immediately after packaging and fails the job on
-violations. The "VirtualCam Smoke Test" step additionally registers the DLL on
-the runner and enumerates it via COM (dynamic V1/V2/V3/V5 checks).
+See `.github/workflows/build-windows.yml` ("Antidetect Audit" step): runs the
+preset-coherence check and `static` on the packaged zip immediately after
+packaging and fails the job on violations. The "VirtualCam Smoke Test" step
+additionally registers the DLL on the runner and enumerates it via COM
+(dynamic V1/V2/V3/V5 checks). The per-OS siblings are
+`tools/vcam-audit-macos/audit-virtualcam.sh` and
+`tools/vcam-audit-linux/audit-virtualcam.sh` (same vector/verdict JSON shape).
 
 ## Samples
 

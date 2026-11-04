@@ -43,7 +43,7 @@ target_link_libraries(
 
 set_target_properties_obs(
   obs-dal-plugin
-  PROPERTIES OUTPUT_NAME obs-mac-virtualcam
+  PROPERTIES OUTPUT_NAME ${VIRTUALCAM_MAC_PLUGIN_FILE}
              FOLDER plugins
              PREFIX ""
              BUNDLE TRUE BUNDLE_EXTENSION plugin MACOSX_BUNDLE_INFO_PLIST
@@ -55,17 +55,16 @@ set_property(TARGET obs-dal-plugin PROPERTY OSX_ARCHITECTURES x86_64 arm64)
 
 target_compile_options(obs-dal-plugin PRIVATE "-Wno-deprecated-declarations")
 
-string(TIMESTAMP CURRENT_YEAR "%Y")
 set_target_xcode_properties(
   obs-dal-plugin
   PROPERTIES CLANG_ENABLE_OBJC_ARC YES
              CLANG_WARN_SUSPICIOUS_IMPLICIT_CONVERSION YES
              GCC_WARN_SHADOW YES
-             PRODUCT_NAME obs-mac-virtualcam
-             PRODUCT_BUNDLE_IDENTIFIER com.obsproject.obs-mac-virtualcam
+             PRODUCT_NAME ${VIRTUALCAM_MAC_PLUGIN_FILE}
+             PRODUCT_BUNDLE_IDENTIFIER ${VIRTUALCAM_DAL_BUNDLE_ID}
              CURRENT_PROJECT_VERSION ${OBS_BUILD_NUMBER}
              MARKETING_VERSION ${OBS_VERSION_CANONICAL}
              GENERATE_INFOPLIST_FILE YES
-             INFOPLIST_KEY_CFBundleDisplayName obs-mac-virtualcam
-             INFOPLIST_KEY_NSHumanReadableCopyright "(c) 2020-${CURRENT_YEAR} John Boiles, Patrick Heyer, Sebastian Beckmann"
+             INFOPLIST_KEY_CFBundleDisplayName ${VIRTUALCAM_MAC_PLUGIN_FILE}
+             INFOPLIST_KEY_NSHumanReadableCopyright "${VIRTUALCAM_MAC_COPYRIGHT}"
 )

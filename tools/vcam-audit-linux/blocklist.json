@@ -1,0 +1,20 @@
+{
+  "$schema_note": "Known virtual camera fingerprints used by audit-virtualcam.sh on Linux. driver_names are matched against v4l2-ctl -D output (V1); name_patterns against card labels (V1); module_names against lsmod (V4-equivalent residual check); sysfs patterns against /sys/class/video4linux/*/device/uevent paths (V4-equivalent).",
+  "schema": 1,
+  "driver_names": [
+    { "pattern": "v4l2 loopback", "product": "stock v4l2loopback module (driver-name tell)" },
+    { "pattern": "uvcvideo", "product": "real UVC driver identity (also what the forked module reports)" },
+    { "pattern": "virtual", "product": "generic virtual video driver" }
+  ],
+  "name_patterns": [
+    { "pattern": "virtual camera", "product": "generic virtual camera" },
+    { "pattern": "obs", "product": "OBS Studio" },
+    { "pattern": "dummy video device", "product": "stock v4l2loopback default label" },
+    { "pattern": "manycam", "product": "ManyCam" },
+    { "pattern": "droidcam", "product": "DroidCam" }
+  ],
+  "module_names": [
+    { "pattern": "v4l2loopback", "product": "stock v4l2loopback (identity reverts to the stock tell)" },
+    { "pattern": "vcamuvc", "product": "this fork (documented residual: the module itself is visible)" }
+  ]
+}

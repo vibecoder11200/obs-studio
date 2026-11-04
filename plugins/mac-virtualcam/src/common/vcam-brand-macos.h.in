@@ -1,0 +1,30 @@
+#pragma once
+
+/* Identity presented by the macOS virtual camera (DAL plugin and CMIO camera
+ * extension). Values come from the VIRTUALCAM_MAC_* / VIRTUALCAM_*
+ * CMake variables (see CMakePresets.json) so every surface that an
+ * AVFoundation / CMIO client can observe stays in sync per build. Defaults
+ * keep a plain build stock; fork presets override them. */
+
+/* DAL plugin device properties (OBSDALDevice.mm / OBSDALStream.mm) */
+#define VIRTUALCAM_MAC_DEVICE_NAME "${VIRTUALCAM_MAC_DEVICE_NAME}"
+#define VIRTUALCAM_MAC_MANUFACTURER "${VIRTUALCAM_MAC_MANUFACTURER}"
+#define VIRTUALCAM_MAC_MODEL "${VIRTUALCAM_MAC_MODEL}"
+#define VIRTUALCAM_MAC_SERIAL "${VIRTUALCAM_MAC_SERIAL}"
+#define VIRTUALCAM_MAC_DEVICE_UID "${VIRTUALCAM_MAC_DEVICE_UID}"
+#define VIRTUALCAM_MAC_ELEMENT_NAME "${VIRTUALCAM_MAC_ELEMENT_NAME}"
+
+/* Mach bridge shared by the OBS plugin (server) and the DAL plugin (client) */
+#define VIRTUALCAM_MACH_SERVICE "${VIRTUALCAM_MACH_SERVICE}"
+
+/* Bundle/file identities the OBS-side plugin (plugin-main.mm) must match:
+ * DAL plugin file name in OBS.app Resources and /Library/CoreMediaIO,
+ * DAL bundle lookup, camera-extension activation request */
+#define VIRTUALCAM_MAC_PLUGIN_FILE "${VIRTUALCAM_MAC_PLUGIN_FILE}"
+#define VIRTUALCAM_DAL_BUNDLE_ID "${VIRTUALCAM_DAL_BUNDLE_ID}"
+#define VIRTUALCAM_EXTENSION_BUNDLE_ID "${VIRTUALCAM_EXTENSION_BUNDLE_ID}"
+
+/* DAL debug test-card user-defaults keys (OBSDALStream.mm) */
+#define VIRTUALCAM_TEST_CARD_WIDTH_KEY "${VIRTUALCAM_DAL_BUNDLE_ID}.test-card-width"
+#define VIRTUALCAM_TEST_CARD_HEIGHT_KEY "${VIRTUALCAM_DAL_BUNDLE_ID}.test-card-height"
+#define VIRTUALCAM_TEST_CARD_FPS_KEY "${VIRTUALCAM_DAL_BUNDLE_ID}.test-card-fps"

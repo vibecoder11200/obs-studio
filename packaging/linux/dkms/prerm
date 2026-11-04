@@ -1,0 +1,13 @@
+#!/bin/sh
+# dkms remove for vcamuvc
+set -e
+
+SRC_DIR="$(ls -d /usr/src/vcamuvc-* 2>/dev/null | head -n 1 || true)"
+
+if [ -n "$SRC_DIR" ] && command -v dkms >/dev/null 2>&1; then
+	MODULE_VERSION="${SRC_DIR#/usr/src/vcamuvc-}"
+	dkms remove -m vcamuvc -v "$MODULE_VERSION" --all >/dev/null 2>&1 || true
+fi
+
+#DEBHELPER#
+exit 0

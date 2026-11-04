@@ -19,7 +19,7 @@ class OBSCameraProviderSource: NSObject, CMIOExtensionProviderSource {
 
         provider = CMIOExtensionProvider(source: self, clientQueue: clientQueue)
         deviceSource = OBSCameraDeviceSource(
-            localizedName: "OBS Virtual Camera",
+            localizedName: VcamBrand.deviceName,
             deviceUUID: deviceUUID,
             sourceUUID: sourceUUID,
             sinkUUID: sinkUUID)
@@ -46,11 +46,11 @@ class OBSCameraProviderSource: NSObject, CMIOExtensionProviderSource {
         let providerProperties = CMIOExtensionProviderProperties(dictionary: [:])
 
         if properties.contains(.providerName) {
-            providerProperties.name = "OBS Camera Extension Provider"
+            providerProperties.name = VcamBrand.providerName
         }
 
         if properties.contains(.providerManufacturer) {
-            providerProperties.manufacturer = "OBS Project"
+            providerProperties.manufacturer = VcamBrand.manufacturer
         }
 
         return providerProperties

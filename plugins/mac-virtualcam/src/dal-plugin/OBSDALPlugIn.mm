@@ -21,6 +21,8 @@
 
 #import "Logging.h"
 
+#import "vcam-brand-macos.h"
+
 typedef enum {
     PlugInStateNotStarted = 0,
     PlugInStateWaitingForServer,
@@ -58,7 +60,7 @@ typedef enum {
 - (instancetype)init
 {
     if (self = [super init]) {
-        _stateQueue = dispatch_queue_create("com.obsproject.obs-mac-virtualcam.dal.state", DISPATCH_QUEUE_SERIAL);
+        _stateQueue = dispatch_queue_create(VIRTUALCAM_MACH_SERVICE ".dal.state", DISPATCH_QUEUE_SERIAL);
 
         _timeoutTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, _stateQueue);
         __weak __typeof(self) weakSelf = self;
@@ -171,7 +173,7 @@ typedef enum {
 {
     switch (address.mSelector) {
         case kCMIOObjectPropertyName:
-            *static_cast<CFStringRef *>(data) = CFSTR("OBS Virtual Camera Plugin");
+            *static_cast<CFStringRef *>(data) = CFSTR(VIRTUALCAM_MAC_DEVICE_NAME " Plugin");
             *dataUsed = sizeof(CFStringRef);
             return;
         default:

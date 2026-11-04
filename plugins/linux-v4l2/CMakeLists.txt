@@ -42,4 +42,13 @@ if(ENABLE_UDEV)
   target_compile_definitions(linux-v4l2 PRIVATE HAVE_UDEV)
 endif()
 
+# Card label passed to the loopback module at modprobe time (see
+# v4l2-output.c). Defaults keep stock behavior; presets override.
+if(NOT VIRTUALCAM_LINUX_CARD_LABEL)
+  set(VIRTUALCAM_LINUX_CARD_LABEL "OBS Virtual Camera" CACHE STRING
+      "Card label for the Linux virtual camera" FORCE)
+endif()
+target_compile_definitions(linux-v4l2 PRIVATE
+  "VIRTUALCAM_LINUX_CARD_LABEL=\"${VIRTUALCAM_LINUX_CARD_LABEL}\"")
+
 set_target_properties_obs(linux-v4l2 PROPERTIES FOLDER plugins PREFIX "")

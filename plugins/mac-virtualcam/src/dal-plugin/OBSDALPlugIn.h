@@ -20,10 +20,11 @@
 #import "OBSDALObjectStore.h"
 #import "OBSDALMachClient.h"
 #import "OBSDALStream.h"
+#import "vcam-brand-macos.h"
 
-#define kTestCardWidthKey  @"obs-mac-virtualcam-test-card-width"
-#define kTestCardHeightKey @"obs-mac-virtualcam-test-card-height"
-#define kTestCardFPSKey    @"obs-mac-virtualcam-test-card-fps"
+#define kTestCardWidthKey  @VIRTUALCAM_TEST_CARD_WIDTH_KEY
+#define kTestCardHeightKey @VIRTUALCAM_TEST_CARD_HEIGHT_KEY
+#define kTestCardFPSKey    @VIRTUALCAM_TEST_CARD_FPS_KEY
 
 NS_ASSUME_NONNULL_BEGIN
 

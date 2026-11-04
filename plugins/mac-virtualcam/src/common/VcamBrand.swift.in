@@ -1,0 +1,11 @@
+/* Identity constants for the CMIO camera extension, generated from the
+ * VIRTUALCAM_MAC_* CMake variables (see CMakePresets.json). */
+
+enum VcamBrand {
+	static let deviceName = "${VIRTUALCAM_MAC_DEVICE_NAME}"
+	static let providerName = "${VIRTUALCAM_MAC_PROVIDER_NAME}"
+	static let manufacturer = "${VIRTUALCAM_MAC_MANUFACTURER}"
+	static let model = "${VIRTUALCAM_MAC_MODEL}"
+	static let streamSourceName = "${VIRTUALCAM_MAC_DEVICE_NAME} Stream Source"
+	static let streamSinkName = "${VIRTUALCAM_MAC_DEVICE_NAME} Stream Sink"
+}

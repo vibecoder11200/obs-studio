@@ -1,0 +1,140 @@
+name: Build macOS
+run-name: Build macOS 🍎 ${{ github.ref_name }}
+
+# Release pipeline (red-team F3: upload-only — the Windows workflow owns
+# release creation; this workflow uploads into it. Creation is guarded but
+# not atomic across the three OS workflows, so a create race falls back to
+# view + upload).
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.ref }}'
+  cancel-in-progress: true
+
+jobs:
+  macos-build:
+    name: macOS Build 🍎 (${{ matrix.target }})
+    runs-on: ${{ matrix.target == 'arm64' && 'macos-15' || 'macos-13' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Intel image name is [UNVERIFIED] until the first dispatch run
+        # confirms what GitHub currently offers (macos-13 is the last free
+        # intel image); fallback if it is retired: ship the arm64 dmg only
+        # and build intel locally with .github/scripts/build-macos.
+        target: [arm64, x86_64]
+    defaults:
+      run:
+        shell: zsh --no-rcs --errexit --pipefail {0}
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Build OBS Studio 🧱
+        uses: ./.github/actions/build-obs
+        with:
+          target: ${{ matrix.target }}
+          config: ${{ startsWith(github.ref, 'refs/tags/') && 'Release' || 'RelWithDebInfo' }}
+
+      - name: Package OBS Studio 📀
+        uses: ./.github/actions/package-obs
+        with:
+          target: ${{ matrix.target }}
+          config: ${{ startsWith(github.ref, 'refs/tags/') && 'Release' || 'RelWithDebInfo' }}
+          package: true
+
+      - name: Identity String Gate 🔍
+        run: |
+          : Identity String Gate — the rebranded virtual camera bundles must
+          : not contain any stock OBS identity strings (phase 2, step 5).
+
+          typeset -a gates
+          gates=(
+            'OBS Virtual Camera'
+            'John Boiles'
+            'obs-virtual-cam-model'
+            'obs-mac-virtualcam'
+          )
+
+          # Every DAL plugin / camera extension built under build_macos (in
+          # the build tree and inside OBS.app), plus the OBS-side plugin
+          # binaries in Contents/PlugIns — those carry the extension bundle
+          # id and the DAL plugin file name at runtime.
+          typeset -a targets
+          targets=($(find build_macos \( -name '*.plugin' -o -name '*.systemextension' \) -type d 2>/dev/null))
+          targets+=($(find build_macos/OBS.app/Contents/PlugIns -type f 2>/dev/null))
+
+          if (( ${#targets[@]} == 0 )); then
+            print -u2 -- '::error::No virtual camera bundles found under build_macos for the identity gate.'
+            exit 1
+          fi
+
+          typeset -i violations=0
+          for target in $targets; do
+            for gate in $gates; do
+              if grep -raqF "${gate}" "${target}" 2>/dev/null; then
+                print -u2 -- "::error::Identity gate violation: '${gate}' found in ${target}"
+                violations=$((violations + 1))
+              fi
+            done
+          done
+
+          if (( violations > 0 )); then
+            print -u2 -- "::error::Identity gate failed with ${violations} violation(s)."
+            exit 1
+          fi
+
+          print -- "Identity gate passed: ${#targets[@]} target(s) clean."
+
+      - name: Upload Build Artifacts 📡
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: obs-studio-macos-${{ matrix.target }}-${{ github.sha }}
+          path: ${{ github.workspace }}/build_macos/obs-studio-*-macos-*.dmg
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload to GitHub Release 🛫
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          : Upload the dmg into the tag release (create it when absent).
+
+          typeset tag="${GITHUB_REF_NAME}"
+          typeset dmg
+          dmg=$(ls build_macos/obs-studio-*-macos-*.dmg 2>/dev/null | head -n 1)
+          if [[ -z "${dmg}" ]]; then
+            print -u2 -- '::error::No dmg found for release upload.'
+            exit 1
+          fi
+
+          typeset version
+          version=$(git describe --tags --long | sed -E 's/-[0-9]+-g[0-9a-f]+$//')
+          typeset arch_name=Intel
+          if [[ '${{ matrix.target }}' == arm64 ]]; then arch_name=Apple; fi
+
+          typeset staged="OBS-Studio-${version}-macOS-${arch_name}.dmg"
+          cp -v "${dmg}" "${staged}"
+
+          if ! gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            # On a creation race with the other OS workflows, fall back to
+            # view (the release then exists) instead of failing the upload.
+            gh release create "${tag}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "OBS Studio ${tag}" \
+              --notes "OBS Studio ${tag} — fork release. macOS build is unsigned (ad-hoc): activate the camera extension with 'systemextensionsctl developer on'." \
+              || gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1
+          fi
+          gh release upload "${tag}" --repo "${GITHUB_REPOSITORY}" --clobber "${staged}"

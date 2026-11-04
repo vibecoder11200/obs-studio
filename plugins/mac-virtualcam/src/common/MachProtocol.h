@@ -5,7 +5,9 @@
 //  Created by John Boiles  on 5/5/20.
 //
 
-#define MACH_SERVICE_NAME "com.obsproject.obs-mac-virtualcam.server"
+#include "vcam-brand-macos.h"
+
+#define MACH_SERVICE_NAME VIRTUALCAM_MACH_SERVICE
 
 typedef enum {
 	//! Initial connect message sent from the client to the server to initiate a connection

@@ -184,3 +184,20 @@ set_target_properties_obs(
 if(MSVC)
   target_link_options(obs-virtualcam-module PRIVATE "/PDBALTPATH:%_PDB%")
 endif()
+
+# Elevated identity helper CLI. Ships next to the module DLLs (admin-protected
+# install dir); resolves the DLLs adjacent to itself at runtime. The generated
+# brand/device headers from the module configure_file calls above provide the
+# compiled identity defaults; the source dir is on the include path so the
+# resource compiler finds vcamctl.manifest next to vcamctl.rc.
+add_executable(vcamctl vcamctl.cpp vcamctl.rc)
+target_include_directories(vcamctl PRIVATE "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
+if(MSVC)
+  # The manifest is embedded as an RT_MANIFEST resource; suppress the
+  # linker-generated one.
+  target_link_options(vcamctl PRIVATE /MANIFEST:NO)
+endif()
+set_target_properties(
+  vcamctl PROPERTIES FOLDER plugins/win-dshow
+                     MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+install(TARGETS vcamctl RUNTIME DESTINATION "${OBS_PLUGIN_DESTINATION}/win-dshow/data" COMPONENT Runtime)
