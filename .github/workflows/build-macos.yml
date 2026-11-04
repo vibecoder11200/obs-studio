@@ -65,8 +65,8 @@ jobs:
 
       - name: Identity String Gate 🔍
         run: |
-          : Identity String Gate — the rebranded virtual camera bundles must
-          : not contain any stock OBS identity strings (phase 2, step 5).
+          # Identity String Gate: the rebranded virtual camera bundles must
+          # not contain any stock OBS identity strings (phase 2, step 5).
 
           typeset -a gates
           gates=(
@@ -119,7 +119,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          : Upload the dmg into the tag release (create it when absent).
+          # Upload the dmg into the tag release (create it when absent).
 
           typeset tag="${GITHUB_REF_NAME}"
           typeset dmg
