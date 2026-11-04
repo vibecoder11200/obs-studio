@@ -70,8 +70,8 @@ Filename: "{sys}\regsvr32.exe"; Parameters: "/u /s ""{app}\core\win-dshow\data\l
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
 	if CurStep = ssPostInstall then begin
-		; OBS looks for the marker at BASE_PATH "../.." from bin\64bit,
-		; i.e. the install root — not next to the binaries.
+		// OBS looks for the marker at BASE_PATH "../.." from bin\64bit,
+		// i.e. the install root - not next to the binaries.
 		if WizardIsTaskSelected('portablemode') then
 			SaveStringToFile(ExpandConstant('{app}\portable_mode'), '', False);
 	end;
