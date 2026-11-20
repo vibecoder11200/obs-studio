@@ -200,6 +200,9 @@ VCamFilter::VCamFilter()
 	  camera_control(this),
 	  video_proc_amp(this)
 {
+	os_atomic_inc_long(&locks);
+	AddRef();
+
 	thread_start = CreateEvent(nullptr, true, false, nullptr);
 	thread_stop = CreateEvent(nullptr, true, false, nullptr);
 
@@ -278,9 +281,6 @@ VCamFilter::VCamFilter()
 	/* ---------------------------------------- */
 
 	th = std::thread([this] { Thread(); });
-
-	AddRef();
-	os_atomic_inc_long(&locks);
 }
 
 VCamFilter::~VCamFilter()
