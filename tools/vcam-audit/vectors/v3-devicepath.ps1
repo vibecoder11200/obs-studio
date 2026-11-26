@@ -27,10 +27,10 @@ function Get-V3Vector {
 				# informational, not distinguishing evidence.
 				if ($path -imatch '^\\\\\?\\usb#vid_([0-9a-f]{4})&pid_([0-9a-f]{4})(&mi_[0-9a-f]{2})?#([^#]+)#') {
 					$vid = $Matches[1]
-					$pid = $Matches[2]
+					$pidVal = $Matches[2]
 					$serial = $Matches[4]
 					$expected = $Blocklist.serial_formats |
-						Where-Object { $_.vid -ieq $vid -and $_.pid -ieq $pid } |
+						Where-Object { $_.vid -ieq $vid -and $_.pid -ieq $pidVal } |
 						Select-Object -First 1
 					if ($expected) {
 						$formatPatterns = @{
@@ -43,7 +43,7 @@ function Get-V3Vector {
 						$serialPattern = $formatPatterns[$expected.format]
 						if ($serialPattern -and ($serial -cnotmatch $serialPattern)) {
 							$verdict = 'WARN'
-							$reason = "serial '$serial' does not match the recorded ${vid}:${pid} format $($expected.format); regenerate the identity's serial"
+							$reason = "serial '$serial' does not match the recorded ${vid}:${pidVal} format $($expected.format); regenerate the identity's serial"
 						}
 					}
 				}
