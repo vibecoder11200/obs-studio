@@ -351,6 +351,11 @@ void OBSBasicVCamConfig::IdentityPresetChanged()
 #endif
 }
 
+#ifdef _WIN32
+static QString FindVcamctl();
+static bool RunVcamctlElevated(QWidget *parent, const QString &vcamctl, const QStringList &args);
+#endif
+
 void OBSBasicVCamConfig::IdentityApply()
 {
 	QString name = ui->identityName->text().trimmed();
@@ -418,6 +423,7 @@ void OBSBasicVCamConfig::IdentityApply()
 
 	QMessageBox::information(this, QTStr("Basic.VCam.Identity.Title"),
 				 QTStr("Basic.VCam.Identity.ApplyRequested"));
+#endif /* __linux__ */
 }
 
 #ifdef _WIN32
@@ -515,7 +521,5 @@ void OBSBasicVCamConfig::IdentityReset()
 				 QTStr("Basic.VCam.Identity.ApplyRequested"));
 }
 #endif /* _WIN32 */
-
-#endif /* __linux__ */
 
 #endif /* _WIN32 || __linux__ */
