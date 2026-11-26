@@ -20,7 +20,7 @@ bundles) — they present the same trademark exposure.
 - **DLL name**: `obs-virtualcam-module{64,32}.dll` → `lvc920x64.dll` / `lvc920x86.dll` / `lvc920arm64.dll`
 - **Binary metadata**: VERSIONINFO fields (company/product/copyright/...) present as the device brand — no OBS traces
 - **Runtime names**: shared-memory section `C920VideoQueue` (`VIRTUALCAM_QUEUE_NAME`), config file `c920-cam.txt` (`VIRTUALCAM_CONFIG_FILE`) — no `OBSVirtualCamVideo` / `obs-virtualcam.txt` artifacts
-- **DevicePath**: the filter's registry Instance key gets a USB-format DevicePath (`\\?\usb#vid_046d&pid_0825#<serial>#...`) with a per-machine serial derived from MachineGuid (`VIRTUALCAM_DEVICE_SERIAL` overrides)
+- **DevicePath**: the filter's registry Instance key gets a USB-format DevicePath (`\\?\usb#vid_046d&pid_082d#<serial>#...`) with a random per-install serial, format-matched to the identity's vendor and persisted at first registration (`VIRTUALCAM_DEVICE_SERIAL` overrides; location-ID presets carry `&mi_00` in the path)
 - **No PDB files** in release packages
 - **CI gate**: `tools/vcam-audit/Audit-VirtualCam.ps1` fails the build on any OBS fingerprint in the package (see its README)
 
@@ -182,8 +182,8 @@ The custom GUID ensures this virtual camera doesn't conflict with the original O
 | `VIRTUALCAM_COMMENTS` | `HD Pro Webcam C920 driver component` | VERSIONINFO Comments |
 | `VIRTUALCAM_QUEUE_NAME` | `C920VideoQueue` | Shared-memory section name |
 | `VIRTUALCAM_CONFIG_FILE` | `c920-cam.txt` | Last-resolution config file name |
-| `VIRTUALCAM_DEVICE_SERIAL` | *(empty = per-machine)* | DevicePath serial (derived from MachineGuid when empty) |
-| `VIRTUALCAM_DEVICE_VIDPID` | `vid_046d&pid_0825` | DevicePath USB VID/PID |
+| `VIRTUALCAM_DEVICE_SERIAL` | *(empty = random + persist)* | DevicePath serial (empty = a random serial matching the VID/PID's vendor format is generated and persisted at first registration) |
+| `VIRTUALCAM_DEVICE_VIDPID` | `vid_046d&pid_082d` | DevicePath USB VID/PID (the real C920 pair) |
 
 Build a neutral-branded variant by overriding these variables — no source edits required.
 
@@ -209,14 +209,29 @@ Every release ships the Windows audit harness inside the package under
 The camera identity can be changed **without a rebuild**:
 
 - OBS → Virtual Camera configuration dialog → *Virtual Camera Identity*:
-  pick a preset (C920 / Brio 500 / Generic UVC / Custom), optionally a serial,
-  and **Apply**. OBS launches `vcamctl.exe` elevated (UAC) and re-registers
-  the camera.
-- CLI: `core\win-dshow\data\vcamctl.exe` with `get`, `set --name N --vid HHHH
-  --pid HHHH [--serial S]`, `reset`, `register`, `unregister`.
+  pick one of **12 verified real-camera presets** (corrected Logitech PIDs,
+  modern external webcams, laptop built-ins, generic cheap UVC — full table
+  in `tools/vcam-audit/README.md`) or *Custom*. Selecting a preset fills
+  name, VID/PID and a **random serial in that camera's real serial format**
+  (the *Regenerate* button re-rolls it for the currently typed VID/PID; the
+  field stays editable). Opening the dialog shows the currently stored
+  identity — Apply without changes changes nothing.
+- CLI: `core\win-dshow\data\vcamctl.exe` with `get`, `set --name N --vid
+  HHHH --pid HHHH [--serial S | --generate]`, `reset`, `register`,
+  `unregister`. `--generate` writes a fresh random serial matching the
+  VID/PID's vendor format.
 
 Overrides are stored under `HKLM\SOFTWARE\Logitech\Identity` (admin-writable
-only) and apply at the next registration. The CLSID/GUID intentionally stays
+only) and apply at the next registration. When no serial override exists,
+the module generates a random serial in the identity's vendor format at its
+first registration and persists it there; `reset` clears it, so the next
+registration generates a fresh serial (reset = replaced physical camera
+unit). A stored serial whose format no longer matches the identity is
+regenerated automatically at registration. The compiled default PID is the
+real C920 pair `vid_046d&pid_082d`; installs that stored the old dialog's
+wrong `pid_0825` C920 identity are migrated to `082d` once at their next
+registration, and their first persisted serial changes the DevicePath once —
+apps re-enumerate and re-pick the camera. The CLSID/GUID intentionally stays
 compile-time. Two caveats:
 
 - Conferencing apps that currently hold the camera may lose it until they are
@@ -233,17 +248,30 @@ cameras; defaults keep stock builds, presets override:
   manufacturer, model/serial/UID, plugin file name (`LogiCamera.plugin`
   instead of `obs-mac-virtualcam.plugin`), bundle IDs
   (`com.logitech.webcam.*`), mach service. Both the DAL plugin and the CMIO
-  camera extension are rebranded. **Signing caveat:** without a Developer ID
-  the camera extension is ad-hoc signed; activating it needs
+  camera extension are rebranded. The DAL-exposed serial (`6CD3369` in older
+  builds) is now **random per install and persisted**, with a logged
+  IOKit-UUID fallback and the compiled constant as the last resort — apps
+  reading the DAL property see a per-machine value. **Scope note:** this
+  covers the legacy DAL surface only; macOS 13 apps enumerating through the
+  camera extension read no serial today (the extension exposes none), so
+  there is nothing to randomize on that path. **Signing caveat:** without a
+  Developer ID the camera extension is ad-hoc signed; activating it needs
   `systemextensionsctl developer on` (SIP reduced) — personal use only. The
   ad-hoc team identifier in `codesign -dv` is the documented residual tell.
 - **Linux**: OBS loads the forked **vcamuvc** module
   (`plugins/linux-v4l2/v4l2loopback-vcam`, DKMS source deb
   `vcamuvc-dkms_*.deb`). `v4l2-ctl -D` reports driver `uvcvideo`, card
-  `HD Pro Webcam C920`, a USB bus_info, discrete C920 sizes at 30 fps.
-  Residual tells (documented, not fixable in a userland module):
-  `lsmod` shows `vcamuvc`, sysfs exposes a virtual platform device, `lsusb`
-  has no entry. If the stock `v4l2loopback` is loaded, OBS prefers
+  `HD Pro Webcam C920`, a USB bus_info, discrete C920 sizes at 30 fps. The
+  card label is **runtime-configurable**: the Virtual Camera identity dialog
+  (preset + name + Apply) persists `VirtualCamera/CardLabel`, and the next
+  virtual camera **start** (no OBS restart needed) applies it at modprobe —
+  OBS reloads the module atomically via a single `pkexec` prompt and
+  restores the previous label if that fails, so the camera never disappears.
+  Cameras with no real serial (laptop built-ins) use the Windows-generated
+  `6&…&0&0000` location-ID form on Windows and the preset name as the card
+  label on Linux. Residual tells (documented, not fixable in a userland
+  module): `lsmod` shows `vcamuvc`, sysfs exposes a virtual platform device,
+  `lsusb` has no entry. If the stock `v4l2loopback` is loaded, OBS prefers
   `vcamuvc` devices; blacklisting the stock module via modprobe.d keeps the
   identity stable.
 
@@ -253,7 +281,7 @@ cameras; defaults keep stock builds, presets override:
 |---|---|---|---|
 | V1 device name | PASS (registry friendly name) | PASS (AVFoundation name) | PASS (`v4l2-ctl -D` card) |
 | V2 CLSID/bundle | PASS (unique GUID) | PASS (bundle IDs) | n/a |
-| V3 DevicePath | PASS (USB-format, per-machine serial) | n/a | n/a |
+| V3 DevicePath | PASS (USB-format, per-machine serial; format-coherence WARN checks the serial against the identity's vendor format) | WARN-capable probe (DAL serial must not equal a shared build constant) | n/a |
 | V4 PnP/sysfs | PASS | n/a | **FAIL (by design)** — virtual platform device, no lsusb |
 | V5 metadata/signature | PASS (VERSIONINFO) | **LIMIT** — ad-hoc signature without Developer ID | PASS (driver name `uvcvideo`) |
 | V6 classification | PASS | PASS | PASS |
@@ -280,10 +308,16 @@ Workflows: `.github/workflows/build-windows.yml` (release owner),
 ### Files Modified
 
 1. `CMakePresets.json` - GUID + brand variables for Windows builds
-2. `plugins/win-dshow/virtualcam-module/` - camera name, metadata, DevicePath, output name
+2. `plugins/win-dshow/virtualcam-module/` - camera name, metadata, DevicePath
+   (random+persist serial, per-vendor formats), output name, `vcamctl`
 3. `shared/obs-shared-memory-queue/` - queue/config file names
 4. `frontend/updater/updater.cpp` - registers the renamed DLLs after updates
-5. `tools/vcam-audit/` - detection audit harness + CI static gate
+5. `frontend/dialogs/OBSBasicVCamConfig.*` - 12-preset identity dialog with
+   serial generator (Windows) and runtime card label (Linux)
+6. `plugins/linux-v4l2/v4l2-output.c` - runtime card label at modprobe
+7. `plugins/mac-virtualcam/` - per-machine DAL serial
+8. `tools/vcam-audit*/` - detection audit harness + CI static gate + serial
+   format coherence
 
 ## Notes
 

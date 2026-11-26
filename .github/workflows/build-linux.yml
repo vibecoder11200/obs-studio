@@ -155,7 +155,7 @@ jobs:
             gh release create "${tag}" \
               --repo "${GITHUB_REPOSITORY}" \
               --title "OBS Studio ${tag}" \
-              --notes "OBS Studio ${tag} — fork release. Linux: install the .deb and the vcamuvc DKMS module deb (reports driver name 'uvcvideo'); or unpack the portable archive and run ./run-portable.sh." \
+              --notes "OBS Studio ${tag} — fork release. Linux: install the .deb and the vcamuvc DKMS module deb (reports driver name 'uvcvideo'); or unpack the portable archive and run ./run-portable.sh. New: the camera card label is runtime-configurable via the OBS Virtual Camera identity dialog (persists to config, applied at the next virtual camera start - a label change reloads the module through one pkexec prompt and recovers the previous label on failure)." \
               || gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1
           fi
           gh release upload "${tag}" --repo "${GITHUB_REPOSITORY}" --clobber \

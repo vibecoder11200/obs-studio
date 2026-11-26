@@ -16,6 +16,7 @@ struct virtualcam_data {
 	int device;
 	uint32_t frame_size;
 	bool use_caps_workaround;
+	char card_label[32];
 };
 
 static const char *virtualcam_name(void *unused)
@@ -117,37 +118,61 @@ bool loopback_module_available()
 	return false;
 }
 
-static int modprobe_with_label(const char *module)
+static int modprobe_with_label(const char *module, const char *label)
 {
 	struct dstr command = {0};
-	struct dstr label = {0};
+	struct dstr escaped = {0};
 	int result;
 
-	dstr_init_copy(&label, VIRTUALCAM_LINUX_CARD_LABEL);
+	dstr_init_copy(&escaped, label);
 	/* the label lands inside a single-quoted shell argument; escape any
 	   single quote instead of letting it break out of the quoting */
-	dstr_replace(&label, "'", "'\\''");
+	dstr_replace(&escaped, "'", "'\\''");
 
-	dstr_init_copy(&command, "pkexec modprobe ");
+	dstr_init_copy(&command, "pkexec sh -c 'modprobe ");
 	dstr_cat(&command, module);
-	dstr_cat(&command, " exclusive_caps=1 card_label='");
-	dstr_cat(&command, label.array);
+	dstr_cat(&command, " exclusive_caps=1 card_label=\"$1\"' sh '");
+	dstr_cat(&command, escaped.array);
 	dstr_cat(&command, "' && sleep 0.5");
 	result = run_command(command.array);
 
 	dstr_free(&command);
-	dstr_free(&label);
+	dstr_free(&escaped);
 	return result;
 }
 
-static int loopback_module_load()
+/* ONE atomic pkexec: rmmod + re-modprobe in a single sh -c, so a denied
+   second polkit prompt (or an EBUSY rmmod) can never leave the camera
+   unloaded. On failure the caller re-modprobes with the OLD label before
+   continuing. */
+static int reload_module(const char *label)
+{
+	struct dstr command = {0};
+	struct dstr escaped = {0};
+	int result;
+
+	dstr_init_copy(&escaped, label);
+	dstr_replace(&escaped, "'", "'\\''");
+
+	dstr_init_copy(&command, "pkexec sh -c 'modprobe -r vcamuvc && sleep 0.5 && modprobe vcamuvc exclusive_caps=1 card_label=\"$1\"' sh '");
+	dstr_cat(&command, escaped.array);
+	dstr_cat(&command, "' && sleep 0.5");
+	result = run_command(command.array);
+
+	dstr_free(&command);
+	dstr_free(&escaped);
+	return result;
+}
+
+static int loopback_module_load(const char *label)
 {
 	/* prefer the forked module (real UVC identity); fall back to the
-	   stock module, whose `v4l2 loopback` driver name stays detectable */
-	if (modprobe_with_label("vcamuvc") == 0)
+	   stock module, whose `v4l2 loopback` compiled-in label is set by the
+	   same card_label parameter */
+	if (modprobe_with_label("vcamuvc", label) == 0)
 		return 0;
 
-	return modprobe_with_label("v4l2loopback");
+	return modprobe_with_label("v4l2loopback", label);
 }
 #else
 bool loopback_module_available()
@@ -277,6 +302,60 @@ static int scanfilter(const struct dirent *entry)
 	return !astrcmp_n(entry->d_name, "video", 5);
 }
 
+/* Card label of the module's device, found by capability (OUTPUT cap +
+   "uvcvideo" driver), never by name: vdev->name is the label itself, so a
+   name scan would false-match the user's real webcams carrying preset
+   product strings. */
+static bool active_card_label(char *label, size_t size)
+{
+	struct dirent **list = NULL;
+	struct v4l2_capability cap;
+	bool found = false;
+	int n;
+
+	n = scandir("/dev", &list, scanfilter,
+#if defined(__linux__)
+		    versionsort
+#else
+		    alphasort
+#endif
+	);
+	if (n == -1)
+		return false;
+
+	for (int i = 0; i < n; ++i) {
+		char device[32] = {0};
+		int fd;
+
+		snprintf(device, sizeof(device), "/dev/%s", list[i]->d_name);
+		fd = open(device, O_RDWR);
+		if (fd < 0) {
+			free(list[i]);
+			continue;
+		}
+		if (ioctl(fd, VIDIOC_QUERYCAP, &cap) < 0) {
+			close(fd);
+			free(list[i]);
+			continue;
+		}
+		if ((cap.device_caps & V4L2_CAP_VIDEO_OUTPUT) &&
+		    strcmp((const char *)cap.driver, "uvcvideo") == 0) {
+			snprintf(label, size, "%s", (const char *)cap.card);
+			found = true;
+		}
+		close(fd);
+		free(list[i]);
+		if (found)
+			break;
+	}
+
+	while (n--)
+		free(list[n]);
+	free(list);
+
+	return found;
+}
+
 static bool virtualcam_start(void *data)
 {
 	struct virtualcam_data *vcam = (struct virtualcam_data *)data;
@@ -285,11 +364,40 @@ static bool virtualcam_start(void *data)
 	int n;
 
 #if defined(__linux__)
+	/* The label applies at modprobe time only: read it from the output
+	   settings (pushed by StartVirtualCam at start, never a ctor-time
+	   snapshot) with the compiled macro as fallback. */
+	char requested[32] = {0};
+	obs_data_t *settings = obs_output_get_settings(vcam->output);
+	const char *label = obs_data_get_string(settings, "card_label");
+	if (label && *label)
+		snprintf(requested, sizeof(requested), "%s", label);
+	obs_data_release(settings);
+
+	if (!*requested) {
+		snprintf(requested, sizeof(requested), "%s", VIRTUALCAM_LINUX_CARD_LABEL);
+	}
+	snprintf(vcam->card_label, sizeof(vcam->card_label), "%s", requested);
+
 	/* only the forked module counts as "already loaded": with the stock
 	   module alone, still load the forked one so the identity holds */
 	if (!loopback_module_loaded_name("vcamuvc")) {
-		if (loopback_module_load() != 0)
+		if (loopback_module_load(requested) != 0)
 			return false;
+	} else {
+		char active[32] = {0};
+		if (active_card_label(active, sizeof(active)) && strcmp(active, requested) != 0) {
+			blog(LOG_INFO, "virtual camera card label change '%s' -> '%s' (atomic module reload)",
+			     active, requested);
+			if (reload_module(requested) != 0) {
+				blog(LOG_WARNING, "label reload failed; restoring the previous card label '%s'",
+				     active);
+				if (reload_module(active) != 0) {
+					blog(LOG_ERROR, "module reload recovery failed; virtual camera unavailable");
+					return false;
+				}
+			}
+		}
 	}
 #endif
 

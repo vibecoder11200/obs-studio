@@ -21,9 +21,12 @@ public:
 private slots:
 	void OutputTypeChanged();
 	void UpdateConfig();
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__linux__)
 	void IdentityPresetChanged();
 	void IdentityApply();
+#endif
+#ifdef _WIN32
+	void IdentityGenerate();
 	void IdentityReset();
 #endif
 

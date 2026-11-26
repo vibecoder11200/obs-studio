@@ -20,6 +20,7 @@
 #import "OBSDALDevice.h"
 
 #include <IOKit/audio/IOAudioTypes.h>
+#include <IOKit/IOKitLib.h>
 
 #import "OBSDALPlugIn.h"
 #import "Logging.h"
@@ -29,6 +30,66 @@
 @property BOOL excludeNonDALAccess;
 @property pid_t masterPid;
 @end
+
+// Cached per-process serial: random per install, persisted in the plugin's
+// NSUserDefaults channel (same suite as the test-card keys). The returned
+// reference is retained once and never released — immortal, matching the
+// CFSTR literal's lifetime contract, so a DAL host releasing it cannot
+// corrupt the cache. Fallback chain, every step logged (DLog):
+//   1. persisted NSUserDefaults "vcam-serial"
+//   2. random (arc4random_buf, OS CSPRNG) + persist
+//   3. FNV-1a over IOPlatformUUID (IOKit, NULL-guarded) — deterministic,
+//      per-machine degraded mode, never silently the world-constant
+//   4. the compiled VIRTUALCAM_MAC_SERIAL constant
+static CFStringRef GetVcamSerial(void)
+{
+	static CFStringRef s_serial = nil;
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{
+		NSString *stored = [[NSUserDefaults standardUserDefaults] stringForKey:@"vcam-serial"];
+		if (!stored) {
+			uint8_t buf[4];
+			arc4random_buf(buf, sizeof(buf));
+			NSString *generated = [NSString stringWithFormat:@"%02X%02X%02X%02X", buf[0], buf[1], buf[2], buf[3]];
+			if ([[NSUserDefaults standardUserDefaults] setObject:generated forKey:@"vcam-serial"]) {
+				stored = generated;
+			} else {
+				DLog(@"vcam serial: persisting the generated serial failed");
+			}
+		}
+
+		if (!stored) {
+			io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPlatformExpertDevice"));
+			if (service) {
+				CFTypeRef uuid = IORegistryEntryCreateCFProperty(service, CFSTR("IOPlatformUUID"), kCFAllocatorDefault, 0);
+				IOObjectRelease(service);
+				if (uuid != NULL) {
+					char uuidBuf[64] = {0};
+					if (CFStringGetCString((CFStringRef)uuid, uuidBuf, sizeof(uuidBuf), kCFStringEncodingUTF8)) {
+						uint32_t hash = 2166136261u;
+						for (const char *p = uuidBuf; *p; ++p) {
+							hash ^= (uint8_t)*p;
+							hash *= 16777619u;
+						}
+						stored = [NSString stringWithFormat:@"%08X", hash];
+					}
+					CFRelease(uuid);
+				} else {
+					DLog(@"vcam serial: IOPlatformUUID read failed");
+				}
+			} else {
+				DLog(@"vcam serial: IOPlatformExpertDevice lookup failed");
+			}
+		}
+
+		if (stored) {
+			// +1 retain, never released: immortal like the CFSTR literal it
+			// replaces (leak-by-design, per red-team retain-semantics note).
+			s_serial = (__bridge_retained CFStringRef)stored;
+		}
+	});
+	return s_serial ?: CFSTR(VIRTUALCAM_MAC_SERIAL);
+}
 
 @implementation OBSDALDevice
 
@@ -113,7 +174,7 @@
             *dataUsed = sizeof(CFStringRef);
             break;
         case kCMIOObjectPropertyElementNumberName:
-            *static_cast<CFStringRef *>(data) = CFSTR(VIRTUALCAM_MAC_SERIAL);
+            *static_cast<CFStringRef *>(data) = GetVcamSerial();
             *dataUsed = sizeof(CFStringRef);
             break;
         case kCMIODevicePropertyPlugIn:

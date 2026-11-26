@@ -24,7 +24,11 @@ fingerprints. Read-only: it never writes the registry, files, or device state.
 | V9 | Config-dir artifacts (`obs-virtualcam.txt`…) | blocklist `config_artifacts` |
 
 Verdicts: `PASS` (indistinguishable at this vector), `WARN` (present but odd),
-`FAIL` (distinguishing evidence found). The audit evaluates the *fork's own
+`FAIL` (distinguishing evidence found). V3 additionally carries a
+**serial-format coherence check**: when the DevicePath's VID/PID pair is one of
+the identities below, the serial segment must match that hardware's real serial
+format — a mismatch is a `WARN` (never `FAIL`; the location-ID form is itself
+Windows-generated) naming the expected format. The audit evaluates the *fork's own
 virtual camera* against the same blocklist an external detector would use —
 old names (`OBSVirtualCamVideo`, `obs-virtualcam.txt`, the upstream OBS CLSID)
 are in the blocklist on purpose so regressions fail loudly.
@@ -96,9 +100,10 @@ out of scope.
 
 `vcamctl.exe` (shipped next to the camera DLLs under `core\win-dshow\data\`)
 changes the identity at runtime: `get` prints what the next registration will
-apply, `set --name N --vid HHHH --pid HHHH [--serial S]` writes the override
-under `HKLM\SOFTWARE\Logitech\Identity` (admin-writable only) and
-re-registers, `reset` returns to the build defaults. After any change, re-run
+apply, `set --name N --vid HHHH --pid HHHH [--serial S | --generate]` writes
+the override under `HKLM\SOFTWARE\Logitech\Identity` (admin-writable only)
+and re-registers, `reset` returns to the build defaults (the next registration
+generates a fresh random serial — reset = replaced camera unit). After any change, re-run
 this scan — no rebuild is needed. The presets offered in the OBS dialog use
 the same mechanism; `check-preset-coherence.ps1` (CI) guarantees they never
 collide with this blocklist.
@@ -106,12 +111,45 @@ collide with this blocklist.
 ## CI wiring
 
 See `.github/workflows/build-windows.yml` ("Antidetect Audit" step): runs the
-preset-coherence check and `static` on the packaged zip immediately after
-packaging and fails the job on violations. The "VirtualCam Smoke Test" step
-additionally registers the DLL on the runner and enumerates it via COM
-(dynamic V1/V2/V3/V5 checks). The per-OS siblings are
+preset-coherence check (now also the dialog↔serial_formats sync) and `static`
+on the packaged zip immediately after packaging and fails the job on
+violations. The "VirtualCam Smoke Test" step additionally registers the DLL on
+the runner, enumerates it via COM (dynamic V1/V2/V3/V5 checks), asserts the
+registered serial's format, and round-trips one `vcamctl set --generate` per
+format class. The per-OS siblings are
 `tools/vcam-audit-macos/audit-virtualcam.sh` and
 `tools/vcam-audit-linux/audit-virtualcam.sh` (same vector/verdict JSON shape).
+
+## Serial formats
+
+The camera presets ship with per-vendor serial formats matching real hardware,
+verified against descriptor dumps and the linuxhw/LsUSB dataset:
+
+| VID:PID | Camera | Serial format | Real example |
+|---|---|---|---|
+| 046d:082d | Logitech HD Pro Webcam C920 | 8HEX | `E1CA2A7F` |
+| 046d:085c | Logitech C922 Pro Stream | 8HEX | — |
+| 046d:0843 | Logitech Webcam C930e | 8HEX | `CAC79E4E` |
+| 046d:085e | Logitech BRIO Ultra HD | 8DIGIT | `93004248` |
+| 046d:0943 | Logitech Brio 500 | 12ALNUM | `2419LZ50AFL8` |
+| 0fd9:0078 | Elgato Facecam | ELGATO | `FW15K1A12513` |
+| 04f2:b76f | ACER HD User Facing | LOCATION | `6&330c68f9&0&0000` |
+| 0408:5365 | HP TrueVision HD Camera | LOCATION | — |
+| 5986:0652 | Lenovo EasyCamera | LOCATION | — |
+| 0c45:6723 | Integrated_Webcam_HD | LOCATION | — |
+| 13d3:56a2 | USB2.0 HD UVC WebCam | LOCATION | — |
+| 0408:1110 | HD Camera (Quanta) | LOCATION | — |
+
+LOCATION identities carry `&mi_00` in the DevicePath (composite UVC layout)
+and use the Windows-generated `6&xxxxxxxx&0&0000` location ID as the serial,
+because these cameras expose no real serial number. A legacy `046d:0825` row
+(the old dialog's wrong C270 PID) is kept so pre-migration installs still
+audit cleanly; the module migrates such installs to `082d` at registration.
+
+The same table exists in `plugins/win-dshow/virtualcam-module/virtualcam-serial.h`
+(the generator) and in the OBS dialog presets. `check-preset-coherence.ps1`
+(CI) cross-checks the dialog rows against the `serial_formats` array in
+`blocklist.json` so the three cannot drift apart.
 
 ## Samples
 

@@ -79,7 +79,7 @@ if(NOT VIRTUALCAM_COMMENTS)
   set(VIRTUALCAM_COMMENTS "HD Pro Webcam C920 driver component")
 endif()
 if(NOT VIRTUALCAM_DEVICE_VIDPID)
-  set(VIRTUALCAM_DEVICE_VIDPID "vid_046d&pid_0825")
+  set(VIRTUALCAM_DEVICE_VIDPID "vid_046d&pid_082d")
 endif()
 
 # Neutral output file name, per architecture (each architecture is its own
@@ -120,7 +120,7 @@ target_sources(
 )
 
 target_include_directories(obs-virtualcam-module PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
-target_compile_definitions(obs-virtualcam-module PRIVATE VIRTUALCAM_AVAILABLE)
+target_compile_definitions(obs-virtualcam-module PRIVATE VIRTUALCAM_AVAILABLE _CRT_RAND_S)
 
 target_link_libraries(
   obs-virtualcam-module
@@ -131,6 +131,7 @@ target_link_libraries(
     OBS::libdshowcapture
     OBS::winhandle
     OBS::threading-windows
+    bcrypt
     gdiplus
     strmiids
     winmm
@@ -192,6 +193,8 @@ endif()
 # resource compiler finds vcamctl.manifest next to vcamctl.rc.
 add_executable(vcamctl vcamctl.cpp vcamctl.rc)
 target_include_directories(vcamctl PRIVATE "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(vcamctl PRIVATE _CRT_RAND_S)
+target_link_libraries(vcamctl PRIVATE bcrypt)
 if(MSVC)
   # The manifest is embedded as an RT_MANIFEST resource; suppress the
   # linker-generated one.

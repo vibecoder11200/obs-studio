@@ -2,9 +2,10 @@
 
 /* Identity of the USB device the virtual camera presents in its registry
  * DevicePath (written under the filter's category Instance key at
- * registration). VIRTUALCAM_DEVICE_SERIAL empty = derive a stable per-machine
- * serial from MachineGuid at registration time, so every installation gets a
- * distinct serial while 32-bit and 64-bit modules on one machine agree. */
+ * registration). VIRTUALCAM_DEVICE_SERIAL empty = generate a random serial
+ * matching the VID/PID's vendor format at registration time and persist it
+ * to the identity key, so every installation gets a distinct serial while
+ * 32-bit and 64-bit modules on one machine agree. */
 
 #define VIRTUALCAM_DEVICE_VIDPID_W L"@VIRTUALCAM_DEVICE_VIDPID@"
 #define VIRTUALCAM_DEVICE_SERIAL_W L"@VIRTUALCAM_DEVICE_SERIAL@"

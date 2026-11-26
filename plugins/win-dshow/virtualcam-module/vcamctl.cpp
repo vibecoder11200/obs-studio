@@ -8,16 +8,20 @@
  * are never used. */
 
 #include <windows.h>
+#include <bcrypt.h>
 #include <shellapi.h>
+#include <shlobj.h>
 #include <strsafe.h>
 #include <wctype.h>
 
 #include <io.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "virtualcam-brand.h"
 #include "virtualcam-device.h"
+#include "virtualcam-serial.h"
 
 /* ========================================================================= */
 
@@ -30,14 +34,16 @@ static const wchar_t *module_entries[] = {
 static void PrintUsage()
 {
 	wprintf(L"usage: vcamctl get\n"
-		L"       vcamctl set --name NAME [--vid HHHH --pid HHHH] [--serial SERIAL]\n"
+		L"       vcamctl set --name NAME [--vid HHHH --pid HHHH] [--serial SERIAL | --generate]\n"
 		L"       vcamctl reset\n"
 		L"       vcamctl register | unregister\n"
 		L"\n"
 		L"get        print the identity the next registration will apply\n"
-		L"set        write identity values, then re-register (omit values to keep them)\n"
-		L"reset      remove all identity values, then re-register\n"
-		L"register   re-register the module DLLs next to vcamctl\n"
+		L"set        write identity values, then re-register (omit values to keep them;\n"
+		L"           --generate writes a random serial matching the vid/pid format)\n"
+		L"reset      remove all identity values, then re-register; the next registration\n"
+		L"           generates a fresh random serial (reset = replaced camera unit)\n"
+		L"register   re-register the module DLLs next to vcamctl (admin required)\n"
 		L"unregister unregister the module DLLs next to vcamctl\n");
 }
 
@@ -93,14 +99,19 @@ static bool ValidSerial(const wchar_t *str)
 {
 	size_t len = wcslen(str);
 
-	if (len == 0 || len > 15) {
+	if (len == 0 || len > 32) {
 		return false;
 	}
 
 	/* DevicePath is composed as usb#vid..#SERIAL#...: keep the charset
-	 * free of the separators and path characters. */
+	 * free of the separators and path characters. Real USB serials are
+	 * ASCII (0x20-0x7F, no comma) — a non-ASCII serial would be a
+	 * detector tell, so the check is ASCII-only. */
 	for (const wchar_t *p = str; *p; ++p) {
-		if (!iswalnum(*p) && !wcschr(L"-_.& ", *p)) {
+		wchar_t c = *p;
+		bool alnum = (c >= L'0' && c <= L'9') || (c >= L'A' && c <= L'Z') || (c >= L'a' && c <= L'z');
+
+		if (!alnum && !wcschr(L"-_.& ", c)) {
 			return false;
 		}
 	}
@@ -220,6 +231,75 @@ static bool ReRegisterModules(bool reg)
 }
 
 /* ------------------------------------------------------------------------ */
+/* serial generation (mirrors the module's entropy helper)                    */
+
+static bool GetRandomEntropy(uint8_t entropy[16])
+{
+	/* NTSTATUS >= 0 is success (NT_SUCCESS is absent in MinGW headers). */
+	if (BCryptGenRandom(nullptr, (PUCHAR)entropy, 16, BCRYPT_USE_SYSTEM_PREFERRED_RNG) >= 0) {
+		return true;
+	}
+
+	for (int i = 0; i < 4; ++i) {
+		unsigned int value;
+
+		if (rand_s(&value) != 0) {
+			return false;
+		}
+		entropy[4 * i + 0] = (uint8_t)(value >> 24);
+		entropy[4 * i + 1] = (uint8_t)(value >> 16);
+		entropy[4 * i + 2] = (uint8_t)(value >> 8);
+		entropy[4 * i + 3] = (uint8_t)value;
+	}
+
+	return true;
+}
+
+/* Resolves the vid/pid a generated serial should match: --vid/--pid, else
+   the stored identity, else the compiled default. */
+static void EffectiveVidPid(const wchar_t *vid, const wchar_t *pid, wchar_t *eff_vid, wchar_t *eff_pid)
+{
+	const wchar_t *at;
+
+	if (vid && pid) {
+		for (int i = 0; i < 4; ++i) {
+			eff_vid[i] = (wchar_t)towlower(vid[i]);
+			eff_pid[i] = (wchar_t)towlower(pid[i]);
+		}
+		eff_vid[4] = L'\0';
+		eff_pid[4] = L'\0';
+		return;
+	}
+
+	if (RegReadIdentityValue(L"Vid", eff_vid, 8) && RegReadIdentityValue(L"Pid", eff_pid, 8) &&
+	    ValidHex4(eff_vid) && ValidHex4(eff_pid)) {
+		for (int i = 0; i < 4; ++i) {
+			eff_vid[i] = (wchar_t)towlower(eff_vid[i]);
+			eff_pid[i] = (wchar_t)towlower(eff_pid[i]);
+		}
+		eff_vid[4] = L'\0';
+		eff_pid[4] = L'\0';
+		return;
+	}
+
+	/* Compiled default: "vid_HHHH&pid_HHHH". */
+	at = wcsstr(VIRTUALCAM_DEVICE_VIDPID_W, L"vid_");
+	if (at != nullptr) {
+		for (int i = 0; i < 4; ++i) {
+			eff_vid[i] = (wchar_t)towlower(at[4 + i]);
+		}
+		eff_vid[4] = L'\0';
+	}
+	at = wcsstr(VIRTUALCAM_DEVICE_VIDPID_W, L"&pid_");
+	if (at != nullptr) {
+		for (int i = 0; i < 4; ++i) {
+			eff_pid[i] = (wchar_t)towlower(at[5 + i]);
+		}
+		eff_pid[4] = L'\0';
+	}
+}
+
+/* ------------------------------------------------------------------------ */
 /* commands                                                                  */
 
 static int CommandGet()
@@ -227,7 +307,7 @@ static int CommandGet()
 	wchar_t name[128];
 	wchar_t vid[16];
 	wchar_t pid[16];
-	wchar_t serial[16];
+	wchar_t serial[33];
 
 	bool has_name = RegReadIdentityValue(L"Name", name, _countof(name));
 	bool has_vid = RegReadIdentityValue(L"Vid", vid, _countof(vid));
@@ -251,7 +331,7 @@ static int CommandGet()
 	} else if (VIRTUALCAM_DEVICE_SERIAL_W[0] != L'\0') {
 		wprintf(L"serial:  %s [default]\n", VIRTUALCAM_DEVICE_SERIAL_W);
 	} else {
-		wprintf(L"serial:  (derived per machine) [default]\n");
+		wprintf(L"serial:  (random, persisted at first registration) [default]\n");
 	}
 
 	return 0;
@@ -263,6 +343,7 @@ static int CommandSet(int argc, wchar_t **argv)
 	const wchar_t *vid = nullptr;
 	const wchar_t *pid = nullptr;
 	const wchar_t *serial = nullptr;
+	bool generate = false;
 
 	for (int i = 2; i < argc; i++) {
 		if (wcscmp(argv[i], L"--name") == 0 && i + 1 < argc) {
@@ -273,6 +354,8 @@ static int CommandSet(int argc, wchar_t **argv)
 			pid = argv[++i];
 		} else if (wcscmp(argv[i], L"--serial") == 0 && i + 1 < argc) {
 			serial = argv[++i];
+		} else if (wcscmp(argv[i], L"--generate") == 0) {
+			generate = true;
 		} else {
 			wprintf(L"vcamctl: unknown or incomplete argument %s\n", argv[i]);
 			PrintUsage();
@@ -280,8 +363,12 @@ static int CommandSet(int argc, wchar_t **argv)
 		}
 	}
 
-	if (!name && !vid && !pid && !serial) {
+	if (!name && !vid && !pid && !serial && !generate) {
 		PrintUsage();
+		return 1;
+	}
+	if (serial && generate) {
+		wprintf(L"vcamctl: --serial and --generate are mutually exclusive\n");
 		return 1;
 	}
 	if (name && !ValidName(name)) {
@@ -297,8 +384,47 @@ static int CommandSet(int argc, wchar_t **argv)
 		return 1;
 	}
 	if (serial && !ValidSerial(serial)) {
-		wprintf(L"vcamctl: invalid serial (1-15 characters: letters, digits, -_.& or space)\n");
+		wprintf(L"vcamctl: invalid serial (1-32 characters: ASCII letters, digits, -_.& or space)\n");
 		return 1;
+	}
+
+	/* Migration (red-team): the old dialog's C920 preset wrote the C270
+	   PID 0825; correct it at the source. */
+	if (pid && _wcsicmp(pid, L"0825") == 0) {
+		const wchar_t *check = name;
+		wchar_t stored_name[128];
+
+		if (!check && RegReadIdentityValue(L"Name", stored_name, _countof(stored_name))) {
+			check = stored_name;
+		}
+		if (check && wcsstr(check, L"C920") != nullptr) {
+			wprintf(L"vcamctl: migrating legacy pid 0825 to the real C920 pid 082D\n");
+			pid = L"082D";
+		}
+	}
+
+	if (generate) {
+		wchar_t eff_vid[8] = L"";
+		wchar_t eff_pid[8] = L"";
+		wchar_t generated[33];
+		uint8_t entropy[16];
+
+		EffectiveVidPid(vid, pid, eff_vid, eff_pid);
+
+		if (!GetRandomEntropy(entropy)) {
+			wprintf(L"vcamctl: entropy generation failed\n");
+			return 2;
+		}
+
+		vcam_format_serial(vcam_serial_format_for(eff_vid, eff_pid), entropy, generated, _countof(generated));
+		serial = generated;
+
+		wprintf(L"vcamctl: generated serial %s\n", generated);
+	}
+
+	if ((vid || pid) && !serial && !generate) {
+		wprintf(L"vcamctl: note: --vid/--pid without --serial or --generate keeps any stored serial; "
+			L"use --generate for a format-matching one\n");
 	}
 
 	if (name && !RegWriteIdentityValue(L"Name", name)) {
@@ -362,6 +488,12 @@ int main(void)
 		return CommandReset();
 	}
 	if (wcscmp(argv[1], L"register") == 0) {
+		/* Registration writes HKLM/HKCR: a non-elevated run would leave
+		   a half-registered module instead of a clear failure. */
+		if (!IsUserAnAdmin()) {
+			wprintf(L"vcamctl: register requires admin rights (run from an elevated shell)\n");
+			return 2;
+		}
 		return ReRegisterModules(true) ? 0 : 2;
 	}
 	if (wcscmp(argv[1], L"unregister") == 0) {

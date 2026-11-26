@@ -329,7 +329,7 @@
         },
         "VIRTUALCAM_DEVICE_VIDPID": {
           "type": "STRING",
-          "value": "vid_046d&pid_0825"
+          "value": "vid_046d&pid_082d"
         },
         "ENABLE_BROWSER": true
       }
@@ -403,7 +403,7 @@
         },
         "VIRTUALCAM_DEVICE_VIDPID": {
           "type": "STRING",
-          "value": "vid_046d&pid_0825"
+          "value": "vid_046d&pid_082d"
         },
         "ENABLE_AJA": false,
         "ENABLE_BROWSER": true,

@@ -276,6 +276,21 @@ bool BasicOutputHandler::StartVirtualCam()
 		SetupOutputs();
 	}
 
+#ifdef __linux__
+	/* Push the runtime card label at START time (not ctor time): the
+	   virtual camera output is created once and never recreated, so a
+	   mid-session dialog Apply must reach the modprobe through an
+	   obs_output_update. The plugin owns the compiled default; the
+	   frontend passes only a non-empty config value. */
+	obs_data_t *vcamSettings = obs_output_get_settings(virtualCam);
+	const char *cardLabel = config_get_string(main->Config(), "VirtualCamera", "CardLabel");
+	if (cardLabel && *cardLabel) {
+		obs_data_set_string(vcamSettings, "card_label", cardLabel);
+		obs_output_update(virtualCam, vcamSettings);
+	}
+	obs_data_release(vcamSettings);
+#endif
+
 	bool success = obs_output_start(virtualCam);
 	if (!success) {
 		QString errorReason;

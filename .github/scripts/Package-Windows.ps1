@@ -88,15 +88,27 @@ function Package {
         # the camera identity without leaving the package (script, blocklist,
         # vector definitions, README - no samples).
         Log-Group "Copying virtual camera audit tooling into package..."
-        $AuditSource = Join-Path $ProjectRoot 'tools/vcam-audit'
-        $AuditFiles = Get-ChildItem -Path $AuditSource -Recurse -File |
-            Where-Object { $_.FullName -notmatch '[\\/]samples[\\/]' }
-        foreach ( $AuditFile in $AuditFiles ) {
-            $RelativePath = $AuditFile.FullName.Substring($AuditSource.Length + 1) -replace '[\\/]', '/'
-            $EntryName = "auxdata/vcam-audit/${RelativePath}"
-            [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($ZipArchive, $AuditFile.FullName, $EntryName) | Out-Null
+        # Nested per-OS layout: the Linux/macOS siblings carry same-named
+        # audit-virtualcam.sh/blocklist.json files, so a flat copy would let
+        # the last copy win. Mirrors the tools/ structure.
+        $AuditDirs = @('vcam-audit', 'vcam-audit-linux', 'vcam-audit-macos')
+        $TotalAuditFiles = 0
+        foreach ( $AuditDirName in $AuditDirs ) {
+            $AuditSource = Join-Path $ProjectRoot "tools/$AuditDirName"
+            if ( -not (Test-Path $AuditSource) ) {
+                Log-Warning "audit tool dir missing, skipped: $AuditSource"
+                continue
+            }
+            $AuditFiles = Get-ChildItem -Path $AuditSource -Recurse -File |
+                Where-Object { $_.FullName -notmatch '[\\/]samples[\\/]' }
+            foreach ( $AuditFile in $AuditFiles ) {
+                $RelativePath = $AuditFile.FullName.Substring($AuditSource.Length + 1) -replace '[\\/]', '/'
+                $EntryName = "auxdata/$AuditDirName/${RelativePath}"
+                [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($ZipArchive, $AuditFile.FullName, $EntryName) | Out-Null
+            }
+            $TotalAuditFiles += @($AuditFiles).Count
         }
-        Log-Information "Added $($AuditFiles.Count) audit files to auxdata/vcam-audit/"
+        Log-Information "Added $TotalAuditFiles audit files to auxdata/vcam-audit{,-linux,-macos}/"
 
         # Portable-mode marker at the package root: OBS looks for it at
         # BASE_PATH "../.." from bin/64bit, i.e. the folder that contains

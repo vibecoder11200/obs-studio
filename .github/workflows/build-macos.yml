@@ -143,7 +143,7 @@ jobs:
             gh release create "${tag}" \
               --repo "${GITHUB_REPOSITORY}" \
               --title "OBS Studio ${tag}" \
-              --notes "OBS Studio ${tag} — fork release. macOS build is unsigned (ad-hoc): activate the camera extension with 'systemextensionsctl developer on'." \
+              --notes "OBS Studio ${tag} — fork release. macOS build is unsigned (ad-hoc): activate the camera extension with 'systemextensionsctl developer on'. New: the DAL plugin now reports a random per-install serial instead of the shared 6CD3369 constant (DAL surface only - macOS 13 camera-extension enumeration exposes no serial)." \
               || gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1
           fi
           gh release upload "${tag}" --repo "${GITHUB_REPOSITORY}" --clobber "${staged}"

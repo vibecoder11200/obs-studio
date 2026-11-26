@@ -39,6 +39,7 @@ target_link_libraries(
     "$<LINK_LIBRARY:FRAMEWORK,CoreMediaIO.framework>"
     "$<LINK_LIBRARY:FRAMEWORK,CoreVideo.framework>"
     "$<LINK_LIBRARY:FRAMEWORK,IOSurface.framework>"
+    "$<LINK_LIBRARY:FRAMEWORK,IOKit.framework>"
 )
 
 set_target_properties_obs(

@@ -19,6 +19,34 @@ function Get-V3Vector {
 			if ($path -imatch $usbPattern) {
 				$verdict = 'PASS'
 				$reason = "DevicePath ($source) has genuine-looking usb#vid&pid format (string level; resolvability is V4)"
+
+				# Serial-format coherence: when the pair is a known camera
+				# identity, the serial must match that hardware's real serial
+				# format. WARN-only by design (never FAIL): the location-ID
+				# form is itself Windows-generated, so a mismatch there is
+				# informational, not distinguishing evidence.
+				if ($path -imatch '^\\\\\?\\usb#vid_([0-9a-f]{4})&pid_([0-9a-f]{4})(&mi_[0-9a-f]{2})?#([^#]+)#') {
+					$vid = $Matches[1]
+					$pid = $Matches[2]
+					$serial = $Matches[4]
+					$expected = $Blocklist.serial_formats |
+						Where-Object { $_.vid -ieq $vid -and $_.pid -ieq $pid } |
+						Select-Object -First 1
+					if ($expected) {
+						$formatPatterns = @{
+							'8HEX'     = '^[0-9A-F]{8}$'
+							'8DIGIT'   = '^[0-9]{8}$'
+							'12ALNUM'  = '^[0-9]{4}[A-Z0-9]{8}$'
+							'ELGATO'   = '^FW[0-9]{2}K1A[0-9]{5}$'
+							'LOCATION' = '^6&[0-9a-f]{8}&0&\d{4}$'
+						}
+						$serialPattern = $formatPatterns[$expected.format]
+						if ($serialPattern -and ($serial -cnotmatch $serialPattern)) {
+							$verdict = 'WARN'
+							$reason = "serial '$serial' does not match the recorded ${vid}:${pid} format $($expected.format); regenerate the identity's serial"
+						}
+					}
+				}
 			} else {
 				$verdict = 'WARN'
 				$reason = "DevicePath ($source) present but not usb# format: $path"

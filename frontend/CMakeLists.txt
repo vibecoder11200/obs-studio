@@ -76,6 +76,14 @@ target_sources(
   PRIVATE obs-main.cpp OBSStudioAPI.cpp OBSStudioAPI.hpp OBSApp.cpp OBSApp.hpp OBSApp_Themes.cpp ui-config.h
 )
 
+# Shared virtual-camera serial-format header (plain C, dependency-free) for
+# the identity dialog's preset table and serial generator. Frontend-to-plugin
+# include: accepted trade-off for single-source-of-truth (see
+# plans/261125-1910-vcam-presets-serial-generator).
+target_include_directories(obs-studio
+  PRIVATE "${CMAKE_SOURCE_DIR}/plugins/win-dshow/virtualcam-module"
+)
+
 if(OS_WINDOWS)
   include(cmake/os-windows.cmake)
 elseif(OS_MACOS)

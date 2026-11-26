@@ -110,6 +110,18 @@ else
 	AV_DEVICES="<swift-not-installed>"
 fi
 
+# Serial probe (V3, informational): the DAL-exposed serial of each CMIO
+# device. Flags a serial that equals the release-build constant 6CD3369 (the
+# per-install random serial shipped since the 2026-11 identity delivery) or
+# the preset-less build default 0001 — both are "every install reports the
+# same value" fingerprints. Any other value = per-machine serial in place.
+VCAM_SERIALS=""
+if command -v swift >/dev/null 2>&1; then
+	VCAM_SERIALS="$(cd "$SCRIPT_DIR" && swift vcam-serial.swift 2>/dev/null || echo "<serial-probe-failed>")"
+else
+	VCAM_SERIALS="<swift-not-installed>"
+fi
+
 # V1 supplemental: system_profiler camera listing.
 SYSTEM_PROFILER_CAMERAS="$(system_profiler SPCameraDataType 2>/dev/null | sed -n 's/^[[:space:]]*\([^:]*\):$/\1/p' | sed '/^$/d')"
 
@@ -189,6 +201,37 @@ if [ -n "$FIRST_DAL" ]; then
 	fi
 fi
 add_row "V5" "${FIRST_DAL:-<none>}" "$CODESIGN_OUTPUT" "$V5_VERDICT" "$V5_REASON"
+
+# V3 row: DAL serial probe (informational). The random+persist serial never
+# FAILs: equality with a known constant is the fingerprint the check exists
+# to catch, but the location of the tell is documentation-grade (a WARN).
+V3_VERDICT="WARN"
+V3_REASON="CMIO serial probe did not run (needs Xcode command line tools)"
+case "$VCAM_SERIALS" in
+"<serial-probe-failed>" | "<swift-not-installed>")
+	;;
+*)
+	[ -n "$VCAM_SERIALS" ] || VCAM_SERIALS="<no-cmio-devices>"
+	;;
+esac
+while IFS=$'\t' read -r dev_name dev_serial; do
+	[ -n "$dev_name" ] || continue
+	case "$dev_serial" in
+	"" | "<no-serial>")
+		V3_VERDICT="WARN"
+		V3_REASON="device exposes no serial (older build without the per-machine serial)"
+		;;
+	6CD3369 | 0001)
+		V3_VERDICT="FAIL"
+		V3_REASON="serial equals the shared build constant '$dev_serial' (world-fingerprint; rebuild with the random+persist serial)"
+		;;
+	*)
+		V3_VERDICT="PASS"
+		V3_REASON="serial is per-machine (does not equal any shared build constant)"
+		;;
+	esac
+	add_row "V3" "$dev_name" "$dev_serial" "$V3_VERDICT" "$V3_REASON"
+done <<<"$VCAM_SERIALS"
 
 # V8 rows: installed DAL plugin file names.
 if [ -n "$DAL_FILES" ]; then

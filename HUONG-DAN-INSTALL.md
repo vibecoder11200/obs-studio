@@ -132,6 +132,47 @@ Phải rebuild từ source code.
 
 ---
 
+## 🎥 Đổi danh tính camera (Dialog Virtual Camera Identity)
+
+Sau khi cài xong, bạn có thể đổi danh tính camera **không cần build lại**,
+ngay trong OBS: mở **Controls → Virtual Camera** → bấm nút cấu hình
+(*Virtual Camera Identity*).
+
+**12 preset camera thật** (đã kiểm chứng VID/PID + định dạng serial của
+camera thật):
+
+- Logitech: C920, C922, C930e, BRIO Ultra HD, Brio 500
+- Elgato Facecam
+- Laptop built-in: ACER HD User Facing, HP TrueVision, Lenovo EasyCamera,
+  Integrated_Webcam_HD (Dell), USB2.0 HD UVC WebCam, HD Camera (Quanta)
+
+Chọn preset → dialog tự điền tên, VID/PID và **một serial ngẫu nhiên đúng
+định dạng của camera đó** (nút *Regenerate* tạo serial mới; ô serial vẫn sửa
+tay được). Bấm **Apply (UAC)** → duyệt câu hỏi Administrator → camera đổi
+danh tính ở lần đăng ký kế tiếp. Mở dialog lần sau sẽ hiển thị danh tính
+đang lưu — bấm Apply không đổi gì thì không có gì xoay vòng.
+
+**Lệnh CLI:** `core\win-dshow\data\vcamctl.exe` — `get`, `set --name N
+--vid HHHH --pid HHHH [--serial S | --generate]`, `reset`, `register`,
+`unregister` (cần quyền Administrator).
+
+**Serial tự động:** nếu chưa có serial nào được lưu, module tự tạo một
+serial ngẫu nhiên khớp định dạng của VID/PID và lưu vào registry ở lần đăng
+ký đầu tiên. `reset` xoá serial → lần đăng ký kế tiếp tạo serial mới hoàn
+toàn (reset = thay camera vật lý mới). Serial tối đa 32 ký tự ASCII.
+
+**Lưu ý khi nâng cấp:** bản cài từng lưu preset C920 cũ (pid `0825` sai) sẽ
+được tự động sửa thành `082d` (pid thật của C920) ở lần đăng ký kế tiếp.
+
+**Linux:** dialog cho chọn preset + tên camera (card label) và lưu vào
+config; nhãn áp dụng ở lần khởi động virtual camera **kế tiếp** (không cần
+khởi động lại OBS).
+
+**Kiểm tra:** chạy công cụ audit kèm theo bản cài (`auxdata/vcam-audit/
+Audit-VirtualCam.ps1 scan`) — cần PowerShell 7.
+
+---
+
 ## 🎁 Files đã thay đổi
 
 Khi build xong, bạn sẽ có file với:

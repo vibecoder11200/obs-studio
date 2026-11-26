@@ -1,6 +1,21 @@
 {
   "$schema_note": "Known virtual camera fingerprints used by Audit-VirtualCam.ps1. name_patterns are case-insensitive substrings matched against device friendly names; clsids are matched against DShow CLSIDs; named_sections are probed via OpenFileMappingW (V8); config_artifacts are filesystem paths with %APPDATA%/%LOCALAPPDATA% expansion (V9); metadata_patterns are matched against DLL VERSIONINFO fields and file names (V5). The static gate uses ONLY static_gate.patterns + static_gate.allowlist (canonical definition, phases 1/2/5 - do not narrow).",
   "schema": 1,
+  "serial_formats": [
+    { "vid": "046d", "pid": "082d", "format": "8HEX" },
+    { "vid": "046d", "pid": "0825", "format": "8HEX", "legacy": "pre-migration installs carrying the old dialog's wrong C270 PID" },
+    { "vid": "046d", "pid": "085c", "format": "8HEX" },
+    { "vid": "046d", "pid": "0843", "format": "8HEX" },
+    { "vid": "046d", "pid": "085e", "format": "8DIGIT" },
+    { "vid": "046d", "pid": "0943", "format": "12ALNUM" },
+    { "vid": "0fd9", "pid": "0078", "format": "ELGATO" },
+    { "vid": "04f2", "pid": "b76f", "format": "LOCATION" },
+    { "vid": "0408", "pid": "5365", "format": "LOCATION" },
+    { "vid": "5986", "pid": "0652", "format": "LOCATION" },
+    { "vid": "0c45", "pid": "6723", "format": "LOCATION" },
+    { "vid": "13d3", "pid": "56a2", "format": "LOCATION" },
+    { "vid": "0408", "pid": "1110", "format": "LOCATION" }
+  ],
   "name_patterns": [
     { "pattern": "obs virtual", "product": "OBS Studio" },
     { "pattern": "obs virtual camera", "product": "OBS Studio" },
