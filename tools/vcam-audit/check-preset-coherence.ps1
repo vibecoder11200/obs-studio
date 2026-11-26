@@ -45,7 +45,7 @@ foreach ($Row in $Rows) {
     $pid = $Row.Groups[3].Value.ToLowerInvariant()
     $fmt = $Row.Groups[4].Value
     if (-not ($Blocklist.serial_formats | Where-Object { $_.vid -ieq $vid -and $_.pid -ieq $pid })) {
-        $Failures3 = @($Failures3) + "preset '$($Row.Groups[1].Value)' ($vid:$pid) has no serial_formats row in blocklist.json"
+        $Failures3 = @($Failures3) + "preset '$($Row.Groups[1].Value)' (${vid}:${pid}) has no serial_formats row in blocklist.json"
     }
     if (-not $FormatPatterns.ContainsKey($fmt)) {
         $Failures3 = @($Failures3) + "preset '$($Row.Groups[1].Value)' uses unknown format '$fmt'"
