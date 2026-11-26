@@ -327,7 +327,13 @@ static bool active_card_label(char *label, size_t size)
 		char device[32] = {0};
 		int fd;
 
-		snprintf(device, sizeof(device), "/dev/%s", list[i]->d_name);
+		/* check the return: -Wformat-truncation fires on the 256-byte
+		   d_name otherwise (CI builds with -Werror) */
+		int written = snprintf(device, sizeof(device), "/dev/%s", list[i]->d_name);
+		if (written < 0 || written >= (int)sizeof(device)) {
+			free(list[i]);
+			continue;
+		}
 		fd = open(device, O_RDWR);
 		if (fd < 0) {
 			free(list[i]);
