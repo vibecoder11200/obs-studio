@@ -51,9 +51,11 @@ static CFStringRef GetVcamSerial(void)
 			uint8_t buf[4];
 			arc4random_buf(buf, sizeof(buf));
 			NSString *generated = [NSString stringWithFormat:@"%02X%02X%02X%02X", buf[0], buf[1], buf[2], buf[3]];
-			if ([[NSUserDefaults standardUserDefaults] setObject:generated forKey:@"vcam-serial"]) {
-				stored = generated;
-			} else {
+			// setObject:forKey: returns void; verify the write by reading it
+			// back, so a failed persist falls through to the IOKit fallback.
+			[[NSUserDefaults standardUserDefaults] setObject:generated forKey:@"vcam-serial"];
+			stored = [[NSUserDefaults standardUserDefaults] stringForKey:@"vcam-serial"];
+			if (!stored) {
 				DLog(@"vcam serial: persisting the generated serial failed");
 			}
 		}
